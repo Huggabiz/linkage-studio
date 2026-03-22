@@ -1,13 +1,14 @@
-import type { Joint, Link, Vec2, SimDragState, AppMode, ForceVector } from '../types';
+import type { Joint, Link, Body, Vec2, SimDragState, AppMode, ForceVector } from '../types';
 import type { CameraState } from '../types';
 import { applyCamera, resetCamera } from './camera';
 import { drawMechanism } from './draw-mechanism';
-import { drawGrid, drawPathTraces, drawLinkGhost, drawForceVectors, drawDragInteraction, drawModeBadge, drawHUD, clearCanvas } from './draw-overlays';
+import { drawGrid, drawPathTraces, drawForceVectors, drawDragInteraction, drawModeBadge, drawHUD, clearCanvas } from './draw-overlays';
 import { lerp } from '../core/math/vec2';
 
 export interface RenderState {
   joints: Record<string, Joint>;
   links: Record<string, Link>;
+  bodies: Record<string, Body>;
   selectedIds: Set<string>;
   hoveredId: string | null;
   camera: CameraState;
@@ -15,11 +16,11 @@ export interface RenderState {
   gridSize: number;
   dof: number;
   cursorWorld: Vec2 | null;
-  linkStartJointId: string | null;
   pathTraces: Map<string, Vec2[]>;
   simDrag: SimDragState | null;
   mode: AppMode;
   forceVectors: ForceVector[];
+  showLinks: boolean;
 }
 
 export function render(
@@ -37,16 +38,9 @@ export function render(
     drawGrid(ctx, state.camera, w, h, state.gridSize);
   }
 
-  drawMechanism(ctx, state.joints, state.links, state.selectedIds, state.hoveredId, state.camera.zoom);
+  drawMechanism(ctx, state.joints, state.links, state.bodies, state.selectedIds, state.hoveredId, state.camera.zoom, state.showLinks);
 
   drawPathTraces(ctx, state.pathTraces, state.camera.zoom);
-
-  if (state.mode === 'create' && state.linkStartJointId && state.cursorWorld) {
-    const startJoint = state.joints[state.linkStartJointId];
-    if (startJoint) {
-      drawLinkGhost(ctx, startJoint.position, state.cursorWorld, state.camera.zoom);
-    }
-  }
 
   if (state.mode === 'simulate' && state.forceVectors.length > 0) {
     drawForceVectors(ctx, state.forceVectors, state.camera.zoom);

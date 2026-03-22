@@ -9,12 +9,6 @@ import {
 } from '../../interaction/tool-manager';
 import type { Vec2 } from '../../types';
 
-const TOOL_CURSORS: Record<string, string> = {
-  select: 'default',
-  joint: 'crosshair',
-  link: 'crosshair',
-  pan: 'grab',
-};
 
 export function MechanismCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -41,6 +35,7 @@ export function MechanismCanvas() {
     render(ctx, canvas, {
       joints: mechanism.joints,
       links: mechanism.links,
+      bodies: mechanism.bodies,
       selectedIds: editor.selectedIds,
       hoveredId: editor.hoveredId,
       camera: editor.camera,
@@ -48,11 +43,11 @@ export function MechanismCanvas() {
       gridSize: editor.gridSize,
       dof: sim.dof,
       cursorWorld: cursorWorldRef.current,
-      linkStartJointId: editor.linkStartJointId,
       pathTraces: sim.pathTraces,
       simDrag: editor.simDrag,
       mode: editor.mode,
       forceVectors: sim.solverResult?.forceVectors || [],
+      showLinks: editor.showLinks,
     });
 
     rafRef.current = requestAnimationFrame(renderLoop);
@@ -69,13 +64,13 @@ export function MechanismCanvas() {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  const activeTool = useEditorStore((s) => s.activeTool);
   const mode = useEditorStore((s) => s.mode);
   const simDrag = useEditorStore((s) => s.simDrag);
+  const hoveredId = useEditorStore((s) => s.hoveredId);
 
   const cursor = mode === 'simulate'
     ? (simDrag?.active ? 'grabbing' : 'grab')
-    : (TOOL_CURSORS[activeTool] || 'default');
+    : (hoveredId ? 'pointer' : 'crosshair');
 
   return (
     <canvas

@@ -15,6 +15,8 @@ interface EditorStore {
   linkStartJointId: string | null;
   simDrag: SimDragState | null;
   savedPositions: Record<string, Vec2> | null;
+  activeBodyIds: Set<string>;
+  showLinks: boolean;
 
   setMode(mode: AppMode): void;
   setTool(tool: ToolType): void;
@@ -29,6 +31,9 @@ interface EditorStore {
   toggleGrid(): void;
   setSimDrag(drag: SimDragState | null): void;
   setSavedPositions(positions: Record<string, Vec2> | null): void;
+  toggleActiveBody(id: string): void;
+  setActiveBody(id: string): void;
+  toggleShowLinks(): void;
 }
 
 export const useEditorStore = create<EditorStore>((set) => ({
@@ -43,6 +48,8 @@ export const useEditorStore = create<EditorStore>((set) => ({
   linkStartJointId: null,
   simDrag: null,
   savedPositions: null,
+  activeBodyIds: new Set(['base']),
+  showLinks: true,
 
   setMode(mode) {
     set({ mode, simDrag: null, linkStartJointId: null, selectedIds: new Set() });
@@ -116,5 +123,22 @@ export const useEditorStore = create<EditorStore>((set) => ({
 
   setSavedPositions(positions) {
     set({ savedPositions: positions });
+  },
+
+  toggleActiveBody(id) {
+    set((s) => {
+      const next = new Set(s.activeBodyIds);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return { activeBodyIds: next };
+    });
+  },
+
+  setActiveBody(id) {
+    set({ activeBodyIds: new Set([id]) });
+  },
+
+  toggleShowLinks() {
+    set((s) => ({ showLinks: !s.showLinks }));
   },
 }));

@@ -7,10 +7,12 @@ export function computeDOF(
   joints: Record<string, Joint>,
   links: Record<string, Link>,
   hasDriver: boolean,
+  fixedJointIds?: Set<string>,
 ): number {
   let unknowns = 0;
   for (const joint of Object.values(joints)) {
-    if (joint.type === 'fixed') continue;
+    const isFixed = fixedJointIds ? fixedJointIds.has(joint.id) : joint.type === 'fixed';
+    if (isFixed) continue;
     unknowns += 2;
   }
 

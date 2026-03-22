@@ -18,8 +18,12 @@ function App() {
       const mech = useMechanismStore.getState();
       const editor = useEditorStore.getState();
 
+      // Compute fixed joint IDs from base body
+      const baseBody = mech.bodies[mech.baseBodyId];
+      const fixedJointIds = new Set<string>(baseBody?.jointIds ?? []);
+
       // Always compute DOF
-      const dof = computeDOF(mech.joints, mech.links, !!sim.driverJointId);
+      const dof = computeDOF(mech.joints, mech.links, !!sim.driverJointId, fixedJointIds);
       if (dof !== sim.dof) sim.setDof(dof);
 
       // --- SIMULATE MODE ---
@@ -44,13 +48,14 @@ function App() {
           sim.dragMultiplier,
           sim.dragDamping,
           SIM_DT * sim.speed,
+          fixedJointIds,
         );
 
         sim.setSolverResult(result);
 
         if (result.converged || result.residual < 1) {
           for (const [jointId, pos] of result.positions) {
-            if (mech.joints[jointId] && mech.joints[jointId].type !== 'fixed') {
+            if (mech.joints[jointId] && !fixedJointIds.has(jointId)) {
               mech.moveJoint(jointId, pos);
             }
           }
@@ -71,7 +76,7 @@ function App() {
       const link = mech.links[sim.driverLinkId];
       if (!link) return;
 
-      const fixedJointId = link.jointIds.find((jid) => mech.joints[jid]?.type === 'fixed');
+      const fixedJointId = link.jointIds.find((jid) => fixedJointIds.has(jid));
       const drivenJointId = link.jointIds.find((jid) => jid !== fixedJointId);
       if (!fixedJointId || !drivenJointId) return;
 
@@ -89,13 +94,13 @@ function App() {
         fixedJointId,
         drivenJointId,
         targetAngle,
-      });
+      }, fixedJointIds);
 
       sim.setSolverResult(result);
 
       if (result.converged) {
         for (const [jointId, pos] of result.positions) {
-          if (mech.joints[jointId] && mech.joints[jointId].type !== 'fixed') {
+          if (mech.joints[jointId] && !fixedJointIds.has(jointId)) {
             mech.moveJoint(jointId, pos);
           }
         }

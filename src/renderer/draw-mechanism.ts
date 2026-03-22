@@ -1,24 +1,24 @@
-import type { Joint, Link } from '../types';
+import type { Joint, Link, Body } from '../types';
 import {
   JOINT_RADIUS, JOINT_RADIUS_FIXED, LINK_WIDTH,
   REVOLUTE_COLOR, FIXED_COLOR, LINK_COLOR,
   SELECTION_COLOR, HOVER_COLOR,
 } from '../utils/constants';
 
-function getJointColor(type: Joint['type']): string {
-  switch (type) {
-    case 'revolute': return REVOLUTE_COLOR;
-    case 'fixed': return FIXED_COLOR;
-  }
+/** Darken a hex color by a factor (0 = black, 1 = original) */
+function darken(hex: string, factor: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgb(${Math.round(r * factor)}, ${Math.round(g * factor)}, ${Math.round(b * factor)})`;
 }
 
 export function drawLink(
   ctx: CanvasRenderingContext2D,
   link: Link,
   joints: Record<string, Joint>,
-  selected: boolean,
-  hovered: boolean,
   zoom: number,
+  color: string,
 ) {
   const jA = joints[link.jointIds[0]];
   const jB = joints[link.jointIds[1]];
@@ -27,8 +27,8 @@ export function drawLink(
   ctx.beginPath();
   ctx.moveTo(jA.position.x, jA.position.y);
   ctx.lineTo(jB.position.x, jB.position.y);
-  ctx.strokeStyle = selected ? SELECTION_COLOR : hovered ? HOVER_COLOR : LINK_COLOR;
-  ctx.lineWidth = (selected ? LINK_WIDTH + 2 : LINK_WIDTH) / zoom;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 4 / zoom;
   ctx.lineCap = 'round';
   ctx.stroke();
 }
@@ -39,24 +39,40 @@ export function drawJoint(
   selected: boolean,
   hovered: boolean,
   zoom: number,
+  memberBodies: Body[],
 ) {
   const { x, y } = joint.position;
   const baseRadius = joint.type === 'fixed' ? JOINT_RADIUS_FIXED : JOINT_RADIUS;
   const r = baseRadius / zoom;
+  const ringWidth = 3 / zoom;
 
-  if (selected || hovered) {
+  // Draw concentric body-color rings (outermost first)
+  for (let i = memberBodies.length - 1; i >= 0; i--) {
+    const ringR = r + (i + 1) * ringWidth + 1 / zoom;
     ctx.beginPath();
-    ctx.arc(x, y, r + 3 / zoom, 0, Math.PI * 2);
+    ctx.arc(x, y, ringR, 0, Math.PI * 2);
+    ctx.strokeStyle = memberBodies[i].color;
+    ctx.lineWidth = ringWidth;
+    ctx.stroke();
+  }
+
+  // Selection / hover ring (outside body rings)
+  if (selected || hovered) {
+    const outerR = r + (memberBodies.length + 1) * ringWidth + 2 / zoom;
+    ctx.beginPath();
+    ctx.arc(x, y, outerR, 0, Math.PI * 2);
     ctx.strokeStyle = selected ? SELECTION_COLOR : HOVER_COLOR;
     ctx.lineWidth = 2 / zoom;
     ctx.stroke();
   }
 
+  // Joint body
   ctx.beginPath();
   ctx.arc(x, y, r, 0, Math.PI * 2);
-  ctx.fillStyle = getJointColor(joint.type);
+  ctx.fillStyle = joint.type === 'fixed' ? FIXED_COLOR : REVOLUTE_COLOR;
   ctx.fill();
 
+  // Inner marker
   if (joint.type === 'revolute') {
     ctx.beginPath();
     ctx.arc(x, y, r * 0.35, 0, Math.PI * 2);
@@ -79,14 +95,46 @@ export function drawMechanism(
   ctx: CanvasRenderingContext2D,
   joints: Record<string, Joint>,
   links: Record<string, Link>,
+  bodies: Record<string, Body>,
   selectedIds: Set<string>,
   hoveredId: string | null,
   zoom: number,
+  showLinks: boolean = true,
 ) {
-  for (const link of Object.values(links)) {
-    drawLink(ctx, link, joints, selectedIds.has(link.id), hoveredId === link.id, zoom);
+  // Build body membership map for joints
+  const jointBodies = new Map<string, Body[]>();
+  for (const body of Object.values(bodies)) {
+    for (const jid of body.jointIds) {
+      const arr = jointBodies.get(jid) || [];
+      arr.push(body);
+      jointBodies.set(jid, arr);
+    }
   }
+
+  // Build link-to-body color map: find the body that owns both endpoints
+  const linkColors = new Map<string, string>();
+  for (const link of Object.values(links)) {
+    const [idA, idB] = link.jointIds;
+    let bestColor = '#666666'; // fallback
+    for (const body of Object.values(bodies)) {
+      if (body.jointIds.includes(idA) && body.jointIds.includes(idB)) {
+        bestColor = body.color;
+        break;
+      }
+    }
+    linkColors.set(link.id, bestColor);
+  }
+
+  // Draw links with body-derived color
+  if (showLinks) {
+    for (const link of Object.values(links)) {
+      drawLink(ctx, link, joints, zoom, linkColors.get(link.id) || '#666666');
+    }
+  }
+
+  // Draw joints with body rings
   for (const joint of Object.values(joints)) {
-    drawJoint(ctx, joint, selectedIds.has(joint.id), hoveredId === joint.id, zoom);
+    const memberBodies = jointBodies.get(joint.id) || [];
+    drawJoint(ctx, joint, selectedIds.has(joint.id), hoveredId === joint.id, zoom, memberBodies);
   }
 }

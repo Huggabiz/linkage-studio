@@ -27,3 +27,17 @@ export const SOLVER_DAMPING = 1.0;
 // Simulation
 export const SIM_DT = 1 / 60;
 export const DEFAULT_MOTOR_SPEED = 1.0;
+
+// Body colors — distinct palette, base body first
+export const BASE_BODY_COLOR = '#E53935';
+export const BODY_COLORS = [
+  '#4CAF50', // green
+  '#FF9800', // orange
+  '#9C27B0', // purple
+  '#00BCD4', // cyan
+  '#795548', // brown
+  '#E91E63', // pink
+  '#607D8B', // blue-grey
+  '#CDDC39', // lime
+  '#FF5722', // deep orange
+];

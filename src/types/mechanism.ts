@@ -18,7 +18,16 @@ export interface Link {
   mass: number;
 }
 
+export interface Body {
+  readonly id: string;
+  name: string;
+  color: string;
+  jointIds: string[];
+}
+
 export interface MechanismState {
   joints: Record<string, Joint>;
   links: Record<string, Link>;
+  bodies: Record<string, Body>;
+  baseBodyId: string;
 }

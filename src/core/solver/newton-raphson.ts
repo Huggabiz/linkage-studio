@@ -74,11 +74,13 @@ function projectConstraints(
  */
 export function solve(
   joints: Record<string, Joint>, links: Record<string, Link>, driver: DriverInfo | null,
+  fixedJointIds?: Set<string>,
 ): SolverResult {
   const freeJoints: Joint[] = [];
   const jointIndex = new Map<string, number>();
   for (const joint of Object.values(joints)) {
-    if (joint.type === 'fixed') continue;
+    const isFixed = fixedJointIds ? fixedJointIds.has(joint.id) : joint.type === 'fixed';
+    if (isFixed) continue;
     jointIndex.set(joint.id, freeJoints.length * 2);
     freeJoints.push(joint);
   }
@@ -169,13 +171,15 @@ export function solveWithForce(
   dragMultiplier: number,
   dragDamping: number,
   dt: number,
+  fixedJointIds?: Set<string>,
 ): SolverResult {
   const freeJoints: Joint[] = [];
   const jointIndex = new Map<string, number>();
   const forceVectors: ForceVector[] = [];
 
   for (const joint of Object.values(joints)) {
-    if (joint.type === 'fixed') continue;
+    const isFixed = fixedJointIds ? fixedJointIds.has(joint.id) : joint.type === 'fixed';
+    if (isFixed) continue;
     jointIndex.set(joint.id, freeJoints.length * 2);
     freeJoints.push(joint);
   }

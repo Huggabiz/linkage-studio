@@ -5,6 +5,11 @@ import { hitTest, hitTestJoint } from './hit-test';
 import { screenToWorld } from '../renderer/camera';
 import { snapToGrid, distance, sub, dot, lengthSq } from '../core/math/vec2';
 
+function isFixed(jointId: string): boolean {
+  const { bodies, baseBodyId } = useMechanismStore.getState();
+  return bodies[baseBodyId]?.jointIds.includes(jointId) ?? false;
+}
+
 let isDragging = false;
 let dragJointId: string | null = null;
 let isPanning = false;
@@ -33,7 +38,7 @@ export function handleMouseDown(e: MouseEvent, canvas: HTMLCanvasElement) {
     if (hit) {
       if (hit.type === 'joint') {
         const joint = hit.item;
-        if (joint.type === 'fixed') return;
+        if (isFixed(joint.id)) return;
         // Find a link connected to this joint
         const linkId = joint.connectedLinkIds[0] || null;
         let grabT = 0;
@@ -56,7 +61,7 @@ export function handleMouseDown(e: MouseEvent, canvas: HTMLCanvasElement) {
         const jB = mechanism.joints[link.jointIds[1]];
         if (!jA || !jB) return;
         // Both endpoints fixed = can't drag
-        if (jA.type === 'fixed' && jB.type === 'fixed') return;
+        if (isFixed(jA.id) && isFixed(jB.id)) return;
 
         // Compute parametric t: project worldPos onto segment AB
         const ab = sub(jB.position, jA.position);
@@ -66,8 +71,8 @@ export function handleMouseDown(e: MouseEvent, canvas: HTMLCanvasElement) {
 
         // Pick the closer non-fixed joint for the jointId reference
         let jointId: string;
-        if (jA.type === 'fixed') jointId = jB.id;
-        else if (jB.type === 'fixed') jointId = jA.id;
+        if (isFixed(jA.id)) jointId = jB.id;
+        else if (isFixed(jB.id)) jointId = jA.id;
         else jointId = t <= 0.5 ? jA.id : jB.id;
 
         editor.setSimDrag({
@@ -84,63 +89,33 @@ export function handleMouseDown(e: MouseEvent, canvas: HTMLCanvasElement) {
   }
 
   // --- CREATE MODE ---
-  const { activeTool } = editor;
+  if (e.button !== 0) return;
 
-  if (activeTool === 'pan') {
+  if (editor.activeTool === 'pan') {
     isPanning = true;
     return;
   }
 
-  if (activeTool === 'select') {
-    const hit = hitTest(worldPos, mechanism.joints, mechanism.links, editor.camera.zoom);
-    if (hit) {
-      if (e.shiftKey) {
-        editor.toggleSelect(hit.item.id);
-      } else {
-        editor.select(hit.item.id);
-      }
-      if (hit.type === 'joint') {
-        isDragging = true;
-        dragJointId = hit.item.id;
-        mechanism.pushHistory();
-      }
+  // Unified click: hit joint = select/drag, empty space = deselect or create
+  const joint = hitTestJoint(worldPos, mechanism.joints, editor.camera.zoom);
+  if (joint) {
+    if (e.shiftKey) {
+      editor.toggleSelect(joint.id);
     } else {
-      editor.clearSelection();
+      editor.select(joint.id);
     }
-  }
-
-  if (activeTool === 'joint') {
+    isDragging = true;
+    dragJointId = joint.id;
+    mechanism.pushHistory();
+  } else if (editor.selectedIds.size > 0) {
+    // A joint is selected — just deselect, don't create
+    editor.clearSelection();
+  } else {
+    // Nothing selected — create a new joint
     const pos = editor.gridEnabled ? snapToGrid(worldPos, editor.gridSize) : worldPos;
-    const id = mechanism.addJoint(editor.jointSubType, pos);
-    editor.select(id);
+    const activeBodyIds = Array.from(editor.activeBodyIds);
+    mechanism.addJoint('revolute', pos, activeBodyIds);
   }
-
-  if (activeTool === 'link') {
-    const joint = hitTestJoint(worldPos, mechanism.joints, editor.camera.zoom);
-    if (editor.linkStartJointId === null) {
-      // First click: use existing joint or create one
-      if (joint) {
-        editor.setLinkStart(joint.id);
-      } else {
-        const pos = editor.gridEnabled ? snapToGrid(worldPos, editor.gridSize) : worldPos;
-        const id = mechanism.addJoint('revolute', pos);
-        editor.setLinkStart(id);
-      }
-    } else {
-      // Second click: use existing joint or create one, then link
-      let endId: string;
-      if (joint) {
-        endId = joint.id;
-      } else {
-        const pos = editor.gridEnabled ? snapToGrid(worldPos, editor.gridSize) : worldPos;
-        endId = mechanism.addJoint('revolute', pos);
-      }
-      const linkId = mechanism.addLink(editor.linkStartJointId, endId);
-      if (linkId) editor.select(linkId);
-      editor.setLinkStart(null);
-    }
-  }
-
 }
 
 export function handleDoubleClick(e: MouseEvent, canvas: HTMLCanvasElement) {
@@ -154,8 +129,12 @@ export function handleDoubleClick(e: MouseEvent, canvas: HTMLCanvasElement) {
 
   const joint = hitTestJoint(worldPos, mechanism.joints, editor.camera.zoom);
   if (joint) {
-    const newType = joint.type === 'revolute' ? 'fixed' : 'revolute';
-    mechanism.updateJointType(joint.id, newType);
+    const baseBodyId = mechanism.baseBodyId;
+    if (isFixed(joint.id)) {
+      mechanism.removeJointFromBody(joint.id, baseBodyId);
+    } else {
+      mechanism.addJointToBody(joint.id, baseBodyId);
+    }
   }
 }
 
@@ -195,8 +174,8 @@ export function handleMouseMove(e: MouseEvent, canvas: HTMLCanvasElement) {
     return;
   }
 
-  const hit = hitTest(worldPos, mechanism.joints, mechanism.links, editor.camera.zoom);
-  editor.setHovered(hit ? hit.item.id : null);
+  const hoverJoint = hitTestJoint(worldPos, mechanism.joints, editor.camera.zoom);
+  editor.setHovered(hoverJoint ? hoverJoint.id : null);
   lastMouse = screenPos;
 }
 
@@ -243,13 +222,9 @@ export function handleKeyDown(e: KeyboardEvent) {
   // --- CREATE MODE shortcuts ---
   if (!e.ctrlKey && !e.metaKey) {
     switch (e.key) {
-      case 's': editor.setTool('select'); return;
-      case 'j': editor.setTool('joint'); return;
-      case 'l': editor.setTool('link'); return;
       case 'g': editor.toggleGrid(); return;
       case 'Escape':
         editor.clearSelection();
-        editor.setLinkStart(null);
         return;
     }
   }
@@ -257,7 +232,6 @@ export function handleKeyDown(e: KeyboardEvent) {
   if (e.key === 'Delete' || e.key === 'Backspace') {
     for (const id of editor.selectedIds) {
       if (mechanism.joints[id]) mechanism.removeJoint(id);
-      else if (mechanism.links[id]) mechanism.removeLink(id);
     }
     editor.clearSelection();
   }

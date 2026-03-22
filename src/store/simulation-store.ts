@@ -53,7 +53,7 @@ export const useSimulationStore = create<SimulationStore>((set) => ({
   pathTraces: new Map(),
   tracingEnabled: false,
   trackedJointIds: new Set(),
-  gravityEnabled: true,
+  gravityEnabled: false,
   gravityStrength: 250,
   damping: 0.5,
   dragMultiplier: 25,
