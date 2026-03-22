@@ -1,0 +1,120 @@
+import { create } from 'zustand';
+import type { AppMode, ToolType, JointSubType, CameraState, SimDragState } from '../types';
+import type { Vec2 } from '../types';
+import { DEFAULT_GRID_SIZE } from '../utils/constants';
+
+interface EditorStore {
+  mode: AppMode;
+  activeTool: ToolType;
+  jointSubType: JointSubType;
+  selectedIds: Set<string>;
+  hoveredId: string | null;
+  camera: CameraState;
+  gridEnabled: boolean;
+  gridSize: number;
+  linkStartJointId: string | null;
+  simDrag: SimDragState | null;
+  savedPositions: Record<string, Vec2> | null;
+
+  setMode(mode: AppMode): void;
+  setTool(tool: ToolType): void;
+  setJointSubType(type: JointSubType): void;
+  select(id: string): void;
+  toggleSelect(id: string): void;
+  clearSelection(): void;
+  setHovered(id: string | null): void;
+  panCamera(delta: Vec2): void;
+  zoomCamera(factor: number, center: Vec2): void;
+  setLinkStart(id: string | null): void;
+  toggleGrid(): void;
+  setSimDrag(drag: SimDragState | null): void;
+  setSavedPositions(positions: Record<string, Vec2> | null): void;
+}
+
+export const useEditorStore = create<EditorStore>((set) => ({
+  mode: 'create',
+  activeTool: 'select',
+  jointSubType: 'revolute',
+  selectedIds: new Set(),
+  hoveredId: null,
+  camera: { pan: { x: 0, y: 0 }, zoom: 1 },
+  gridEnabled: true,
+  gridSize: DEFAULT_GRID_SIZE,
+  linkStartJointId: null,
+  simDrag: null,
+  savedPositions: null,
+
+  setMode(mode) {
+    set({ mode, simDrag: null, linkStartJointId: null, selectedIds: new Set() });
+  },
+
+  setTool(tool) {
+    set({ activeTool: tool, linkStartJointId: null });
+  },
+
+  setJointSubType(type) {
+    set({ jointSubType: type });
+  },
+
+  select(id) {
+    set({ selectedIds: new Set([id]) });
+  },
+
+  toggleSelect(id) {
+    set((s) => {
+      const next = new Set(s.selectedIds);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return { selectedIds: next };
+    });
+  },
+
+  clearSelection() {
+    set({ selectedIds: new Set() });
+  },
+
+  setHovered(id) {
+    set({ hoveredId: id });
+  },
+
+  panCamera(delta) {
+    set((s) => ({
+      camera: {
+        ...s.camera,
+        pan: { x: s.camera.pan.x + delta.x, y: s.camera.pan.y + delta.y },
+      },
+    }));
+  },
+
+  zoomCamera(factor, center) {
+    set((s) => {
+      const newZoom = Math.max(0.1, Math.min(10, s.camera.zoom * factor));
+      const zoomRatio = newZoom / s.camera.zoom;
+      return {
+        camera: {
+          zoom: newZoom,
+          pan: {
+            x: center.x - (center.x - s.camera.pan.x) * zoomRatio,
+            y: center.y - (center.y - s.camera.pan.y) * zoomRatio,
+          },
+        },
+      };
+    });
+  },
+
+  setLinkStart(id) {
+    set({ linkStartJointId: id });
+  },
+
+  toggleGrid() {
+    set((s) => ({ gridEnabled: !s.gridEnabled }));
+  },
+
+  setSimDrag(drag) {
+    set({ simDrag: drag });
+  },
+
+  setSavedPositions(positions) {
+    set({ savedPositions: positions });
+  },
+}));

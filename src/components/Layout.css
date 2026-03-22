@@ -1,0 +1,169 @@
+.app-layout {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #1e1e1e;
+  color: #ccc;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.canvas-container {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.right-panel {
+  width: 220px;
+  background: #1e1e1e;
+  border-left: 1px solid #333;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-content {
+  padding: 8px 10px;
+  border-bottom: 1px solid #333;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.panel-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #888;
+  letter-spacing: 0.5px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.panel-info {
+  font-size: 12px;
+  color: #aaa;
+}
+
+.panel-empty {
+  padding: 12px 10px;
+  color: #666;
+  font-size: 12px;
+  font-style: italic;
+}
+
+.panel-action-btn {
+  background: #333;
+  border: none;
+  color: #ccc;
+  padding: 2px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.panel-action-btn:hover {
+  background: #444;
+}
+
+.panel-content label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #aaa;
+}
+
+.panel-content input[type="number"] {
+  width: 70px;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  color: #ccc;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-size: 12px;
+}
+
+.panel-content select {
+  background: #2a2a2a;
+  border: 1px solid #444;
+  color: #ccc;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-size: 12px;
+}
+
+.panel-content input[type="range"] {
+  flex: 1;
+  accent-color: #2196F3;
+}
+
+.layer-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.layer-row:hover {
+  background: #2a2a2a;
+}
+
+.layer-row.active {
+  background: #333;
+}
+
+.layer-color {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.layer-name {
+  flex: 1;
+  font-size: 12px;
+}
+
+.layer-btn {
+  background: none;
+  border: none;
+  color: #888;
+  padding: 1px 4px;
+  cursor: pointer;
+  font-size: 11px;
+  border-radius: 2px;
+}
+
+.layer-btn:hover {
+  background: #444;
+  color: #ccc;
+}
+
+.layer-btn.danger:hover {
+  background: #5a2020;
+  color: #f66;
+}
+
+.sim-controls {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.sim-controls .tool-btn {
+  flex: 1;
+  min-width: 50px;
+  justify-content: center;
+  font-size: 11px;
+  padding: 4px 6px;
+}
