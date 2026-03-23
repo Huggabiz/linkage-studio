@@ -58,6 +58,17 @@ export function worldToLocal(worldPt: Vec2, transform: BodyTransform): Vec2 {
   return rotate(relative, -transform.angle);
 }
 
+/** Compute the signed area of a closed polygon. Returns absolute value. */
+export function polygonArea(points: Vec2[]): number {
+  if (points.length < 3) return 0;
+  let area = 0;
+  for (let i = 0; i < points.length; i++) {
+    const j = (i + 1) % points.length;
+    area += points[i].x * points[j].y - points[j].x * points[i].y;
+  }
+  return Math.abs(area / 2);
+}
+
 /** Compute the centroid (center of area) of a closed polygon. */
 export function polygonCentroid(points: Vec2[]): Vec2 {
   if (points.length === 0) return { x: 0, y: 0 };

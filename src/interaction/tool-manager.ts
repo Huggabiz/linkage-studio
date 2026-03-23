@@ -96,32 +96,63 @@ export function handleMouseDown(e: PointerEvent, canvas: HTMLCanvasElement) {
     if (outlineHit) {
       const body = mechanism.bodies[outlineHit.bodyId];
       if (body) {
-        // Find the closest non-fixed joint in this body
-        let bestJointId: string | null = null;
+        // Find the body's link closest to the grab point, and compute parametric t
+        // This makes the drag apply force at the actual grab location on the body
+        const bodyJointSet = new Set(body.jointIds);
+        let bestLink: string | null = null;
+        let bestT = 0.5;
         let bestDist = Infinity;
-        for (const jid of body.jointIds) {
-          if (isFixed(jid)) continue;
-          const j = mechanism.joints[jid];
-          if (!j) continue;
-          const d = distance(worldPos, j.position);
-          if (d < bestDist) { bestDist = d; bestJointId = jid; }
-        }
-        if (bestJointId) {
-          // Find a link connected to this joint
-          const joint = mechanism.joints[bestJointId];
-          const linkId = joint.connectedLinkIds[0] || null;
-          let grabT = 0;
-          if (linkId) {
-            const link = mechanism.links[linkId];
-            if (link) grabT = link.jointIds[0] === bestJointId ? 0 : 1;
+        let bestJointId: string | null = null;
+
+        for (const link of Object.values(mechanism.links)) {
+          // Only consider links whose both joints are in this body
+          if (!bodyJointSet.has(link.jointIds[0]) || !bodyJointSet.has(link.jointIds[1])) continue;
+          const jA = mechanism.joints[link.jointIds[0]];
+          const jB = mechanism.joints[link.jointIds[1]];
+          if (!jA || !jB) continue;
+          // Skip if both endpoints are fixed
+          if (isFixed(jA.id) && isFixed(jB.id)) continue;
+
+          // Project worldPos onto this link segment
+          const ab = sub(jB.position, jA.position);
+          const ap = sub(worldPos, jA.position);
+          const abLen = lengthSq(ab);
+          const t = abLen > 1e-8 ? Math.max(0, Math.min(1, dot(ap, ab) / abLen)) : 0.5;
+          const projX = jA.position.x + ab.x * t;
+          const projY = jA.position.y + ab.y * t;
+          const d = Math.sqrt((worldPos.x - projX) ** 2 + (worldPos.y - projY) ** 2);
+
+          if (d < bestDist) {
+            bestDist = d;
+            bestLink = link.id;
+            bestT = t;
+            // Pick the closer non-fixed joint as reference
+            if (isFixed(jA.id)) bestJointId = jB.id;
+            else if (isFixed(jB.id)) bestJointId = jA.id;
+            else bestJointId = t <= 0.5 ? jA.id : jB.id;
           }
+        }
+
+        // Fallback: if no link found, use nearest non-fixed joint directly
+        if (!bestJointId) {
+          let fallbackDist = Infinity;
+          for (const jid of body.jointIds) {
+            if (isFixed(jid)) continue;
+            const j = mechanism.joints[jid];
+            if (!j) continue;
+            const d = distance(worldPos, j.position);
+            if (d < fallbackDist) { fallbackDist = d; bestJointId = jid; }
+          }
+        }
+
+        if (bestJointId) {
           editor.setSimDrag({
             active: true,
             grabPoint: worldPos,
             cursorPoint: worldPos,
             jointId: bestJointId,
-            linkId,
-            grabT,
+            linkId: bestLink,
+            grabT: bestT,
           });
         }
       }
