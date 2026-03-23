@@ -62,6 +62,8 @@ export function MechanismCanvas() {
         const activeId = [...editor.activeBodyIds][0];
         return activeId && mechanism.bodies[activeId] ? mechanism.bodies[activeId].color : '#888888';
       })(),
+      gravityEnabled: sim.gravityEnabled,
+      gravityStrength: sim.gravityStrength,
     });
 
     rafRef.current = requestAnimationFrame(renderLoop);
@@ -76,6 +78,26 @@ export function MechanismCanvas() {
     const handler = (e: KeyboardEvent) => handleKeyDown(e);
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  // Prevent Safari/iOS gesture zoom on the canvas
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const preventGesture = (e: Event) => e.preventDefault();
+    canvas.addEventListener('gesturestart', preventGesture);
+    canvas.addEventListener('gesturechange', preventGesture);
+    canvas.addEventListener('gestureend', preventGesture);
+    // Prevent touch-based scrolling/zooming that might bypass touchAction
+    canvas.addEventListener('touchstart', preventGesture, { passive: false });
+    canvas.addEventListener('touchmove', preventGesture, { passive: false });
+    return () => {
+      canvas.removeEventListener('gesturestart', preventGesture);
+      canvas.removeEventListener('gesturechange', preventGesture);
+      canvas.removeEventListener('gestureend', preventGesture);
+      canvas.removeEventListener('touchstart', preventGesture);
+      canvas.removeEventListener('touchmove', preventGesture);
+    };
   }, []);
 
   const mode = useEditorStore((s) => s.mode);
@@ -116,6 +138,9 @@ export function MechanismCanvas() {
       ref={canvasRef}
       style={{ width: '100%', height: '100%', cursor, userSelect: 'none', touchAction: 'none' }}
       onPointerDown={(e) => {
+        // Prevent default for touch/pen to stop browser gestures
+        if (e.pointerType !== 'mouse') e.preventDefault();
+
         const canvas = canvasRef.current!;
         canvas.setPointerCapture(e.pointerId);
         activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -140,6 +165,7 @@ export function MechanismCanvas() {
         }
       }}
       onPointerMove={(e) => {
+        if (e.pointerType !== 'mouse') e.preventDefault();
         activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
         // Pinch-to-zoom when 2+ pointers active

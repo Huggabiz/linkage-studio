@@ -76,6 +76,63 @@ export function hitTestOutline(
   return closest;
 }
 
+/** Point-in-polygon test using ray casting. */
+function pointInPolygon(pt: Vec2, polygon: Vec2[]): boolean {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const yi = polygon[i].y, yj = polygon[j].y;
+    const xi = polygon[i].x, xj = polygon[j].x;
+    if ((yi > pt.y) !== (yj > pt.y) && pt.x < (xj - xi) * (pt.y - yi) / (yj - yi) + xi) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+/**
+ * Hit-test outlines as filled shapes (not just edges) for simulate mode dragging.
+ * Returns only outlines where the click point is NOT inside any other body's outline
+ * (i.e., non-overlapping regions). Excludes base body outlines.
+ */
+export function hitTestOutlineFilled(
+  worldPos: Vec2,
+  outlines: Record<string, Outline>,
+  bodies: Record<string, Body>,
+  joints: Record<string, Joint>,
+  baseBodyId: string,
+): Outline | null {
+  // Compute world-space polygons for all outlines
+  const outlinePolygons: { outline: Outline; worldPts: Vec2[] }[] = [];
+  for (const outline of Object.values(outlines)) {
+    const body = bodies[outline.bodyId];
+    if (!body || outline.points.length < 3) continue;
+    const transform = computeBodyTransform(body, joints);
+    const worldPts = outline.points.map((p) => localToWorld(p, transform));
+    outlinePolygons.push({ outline, worldPts });
+  }
+
+  // Find all outlines containing the point
+  const hits: { outline: Outline; bodyId: string }[] = [];
+  for (const { outline, worldPts } of outlinePolygons) {
+    if (pointInPolygon(worldPos, worldPts)) {
+      hits.push({ outline, bodyId: outline.bodyId });
+    }
+  }
+
+  if (hits.length === 0) return null;
+
+  // Filter out base body outlines
+  const nonBase = hits.filter((h) => h.bodyId !== baseBodyId);
+  if (nonBase.length === 0) return null;
+
+  // If multiple bodies' outlines overlap at this point, skip (return null)
+  const uniqueBodyIds = new Set(nonBase.map((h) => h.bodyId));
+  if (uniqueBodyIds.size > 1) return null;
+
+  // Return the first non-base outline (they're all from the same body)
+  return nonBase[0].outline;
+}
+
 export function hitTest(
   worldPos: Vec2,
   joints: Record<string, Joint>,

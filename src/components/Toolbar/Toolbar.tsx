@@ -2,6 +2,7 @@ import { useEditorStore } from '../../store/editor-store';
 import { useMechanismStore } from '../../store/mechanism-store';
 import type { AppMode, CreateTool, JointMode } from '../../types';
 import type { Vec2 } from '../../types';
+import { serializeMechanism, deserializeMechanism, downloadFile, openFilePicker } from '../../utils/file-io';
 import './Toolbar.css';
 
 export function Toolbar() {
@@ -15,9 +16,30 @@ export function Toolbar() {
   const savedPositions = useEditorStore((s) => s.savedPositions);
   const undo = useMechanismStore((s) => s.undo);
   const redo = useMechanismStore((s) => s.redo);
+  const clearAll = useMechanismStore((s) => s.clearAll);
+  const loadState = useMechanismStore((s) => s.loadState);
   const joints = useMechanismStore((s) => s.joints);
+  const bodies = useMechanismStore((s) => s.bodies);
+  const links = useMechanismStore((s) => s.links);
+  const outlines = useMechanismStore((s) => s.outlines);
+  const baseBodyId = useMechanismStore((s) => s.baseBodyId);
   const moveJoint = useMechanismStore((s) => s.moveJoint);
   const regenerateLinks = useMechanismStore((s) => s.regenerateLinks);
+
+  const handleSave = () => {
+    const json = serializeMechanism(joints, links, bodies, baseBodyId, outlines);
+    const timestamp = new Date().toISOString().slice(0, 16).replace(/[:-]/g, '');
+    downloadFile(json, `linkage_${timestamp}.slinker`);
+  };
+
+  const handleOpen = async () => {
+    const json = await openFilePicker();
+    if (!json) return;
+    const state = deserializeMechanism(json);
+    if (!state) { alert('Invalid file format'); return; }
+    loadState(state);
+    useEditorStore.getState().clearSelection();
+  };
 
   const handleModeSwitch = (newMode: AppMode) => {
     if (newMode === mode) return;
@@ -46,6 +68,12 @@ export function Toolbar() {
 
   return (
     <div className="toolbar">
+      <div className="toolbar-section">
+        <div className="toolbar-label">File</div>
+        <button className="tool-btn" onClick={handleSave}>Save</button>
+        <button className="tool-btn" onClick={handleOpen}>Open</button>
+      </div>
+
       <div className="toolbar-section mode-toggle">
         <button
           className={`mode-btn ${mode === 'create' ? 'active' : ''}`}
@@ -99,6 +127,14 @@ export function Toolbar() {
             <div className="toolbar-label">Edit</div>
             <button className="tool-btn" onClick={undo} title="Undo (Ctrl+Z)">Undo</button>
             <button className="tool-btn" onClick={redo} title="Redo (Ctrl+Y)">Redo</button>
+            <button
+              className="tool-btn"
+              onClick={() => { if (confirm('Clear everything?')) { clearAll(); useEditorStore.getState().clearSelection(); } }}
+              title="Clear all joints, bodies, and outlines"
+              style={{ color: '#f66', marginTop: 4 }}
+            >
+              Clear All
+            </button>
           </div>
 
           <div className="toolbar-section">
@@ -126,7 +162,7 @@ export function Toolbar() {
       ) : (
         <div className="toolbar-section">
           <div className="toolbar-label">Interact</div>
-          <div className="sim-hint">Click & drag joints or links to apply force</div>
+          <div className="sim-hint">Click & drag joints, links, or shapes to apply force</div>
           <div className="sim-hint">Middle-click to pan</div>
           <div className="sim-hint">Scroll to zoom</div>
         </div>
