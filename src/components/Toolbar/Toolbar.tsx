@@ -18,11 +18,15 @@ export function Toolbar() {
   const redo = useMechanismStore((s) => s.redo);
   const clearAll = useMechanismStore((s) => s.clearAll);
   const loadState = useMechanismStore((s) => s.loadState);
+  const removeJoint = useMechanismStore((s) => s.removeJoint);
+  const removeOutline = useMechanismStore((s) => s.removeOutline);
   const joints = useMechanismStore((s) => s.joints);
   const bodies = useMechanismStore((s) => s.bodies);
   const links = useMechanismStore((s) => s.links);
   const outlines = useMechanismStore((s) => s.outlines);
   const baseBodyId = useMechanismStore((s) => s.baseBodyId);
+  const selectedIds = useEditorStore((s) => s.selectedIds);
+  const clearSelection = useEditorStore((s) => s.clearSelection);
   const moveJoint = useMechanismStore((s) => s.moveJoint);
   const regenerateLinks = useMechanismStore((s) => s.regenerateLinks);
 
@@ -39,6 +43,15 @@ export function Toolbar() {
     if (!state) { alert('Invalid file format'); return; }
     loadState(state);
     useEditorStore.getState().clearSelection();
+  };
+
+  const hasSelection = selectedIds.size > 0;
+  const handleDeleteSelected = () => {
+    for (const id of selectedIds) {
+      if (joints[id]) removeJoint(id);
+      else if (outlines[id]) removeOutline(id);
+    }
+    clearSelection();
   };
 
   const handleModeSwitch = (newMode: AppMode) => {
@@ -127,9 +140,19 @@ export function Toolbar() {
             <div className="toolbar-label">Edit</div>
             <button className="tool-btn" onClick={undo} title="Undo (Ctrl+Z)">Undo</button>
             <button className="tool-btn" onClick={redo} title="Redo (Ctrl+Y)">Redo</button>
+            {hasSelection && (
+              <button
+                className="tool-btn"
+                onClick={handleDeleteSelected}
+                title="Delete selected (Backspace)"
+                style={{ color: '#E53935' }}
+              >
+                Delete
+              </button>
+            )}
             <button
               className="tool-btn"
-              onClick={() => { if (confirm('Clear everything?')) { clearAll(); useEditorStore.getState().clearSelection(); } }}
+              onClick={() => { if (confirm('Clear everything?')) { clearAll(); clearSelection(); } }}
               title="Clear all joints, bodies, and outlines"
               style={{ color: '#f66', marginTop: 4 }}
             >

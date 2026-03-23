@@ -1,13 +1,13 @@
 import { useEditorStore } from '../../store/editor-store';
 import { useMechanismStore } from '../../store/mechanism-store';
-import type { Joint } from '../../types';
+import type { Joint, Outline } from '../../types';
 
 export function PropertyPanel() {
   const selectedIds = useEditorStore((s) => s.selectedIds);
-  const clearSelection = useEditorStore((s) => s.clearSelection);
   const joints = useMechanismStore((s) => s.joints);
+  const outlines = useMechanismStore((s) => s.outlines);
+  const bodies = useMechanismStore((s) => s.bodies);
   const moveJoint = useMechanismStore((s) => s.moveJoint);
-  const removeJoint = useMechanismStore((s) => s.removeJoint);
 
   if (selectedIds.size === 0) {
     return null;
@@ -15,41 +15,45 @@ export function PropertyPanel() {
 
   const id = [...selectedIds][0];
   const joint = joints[id] as Joint | undefined;
+  const outline = outlines[id] as Outline | undefined;
 
-  if (!joint) return null;
+  if (joint) {
+    return (
+      <div className="panel-content">
+        <div className="panel-title">Joint</div>
+        <div className="panel-info" style={{ fontStyle: 'italic', opacity: 0.7 }}>
+          {joint.type === 'fixed' ? 'Fixed (Base)' : 'Revolute'}
+        </div>
+        <label>
+          X
+          <input
+            type="number"
+            value={joint.position.x.toFixed(1)}
+            onChange={(e) => moveJoint(joint.id, { x: +e.target.value, y: joint.position.y })}
+          />
+        </label>
+        <label>
+          Y
+          <input
+            type="number"
+            value={joint.position.y.toFixed(1)}
+            onChange={(e) => moveJoint(joint.id, { x: joint.position.x, y: +e.target.value })}
+          />
+        </label>
+      </div>
+    );
+  }
 
-  return (
-    <div className="panel-content">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div className="panel-title" style={{ margin: 0 }}>Joint</div>
-        <button
-          className="tool-btn"
-          style={{ fontSize: 10, padding: '2px 6px', color: '#E53935' }}
-          onClick={() => { removeJoint(joint.id); clearSelection(); }}
-          title="Delete joint (Backspace)"
-        >
-          Delete
-        </button>
+  if (outline) {
+    const body = bodies[outline.bodyId];
+    return (
+      <div className="panel-content">
+        <div className="panel-title">Outline</div>
+        <div className="panel-info">Body: {body?.name ?? 'Unknown'}</div>
+        <div className="panel-info">{outline.points.length} vertices</div>
       </div>
-      <div className="panel-info" style={{ fontStyle: 'italic', opacity: 0.7 }}>
-        {joint.type === 'fixed' ? 'Fixed (Base)' : 'Revolute'}
-      </div>
-      <label>
-        X
-        <input
-          type="number"
-          value={joint.position.x.toFixed(1)}
-          onChange={(e) => moveJoint(joint.id, { x: +e.target.value, y: joint.position.y })}
-        />
-      </label>
-      <label>
-        Y
-        <input
-          type="number"
-          value={joint.position.y.toFixed(1)}
-          onChange={(e) => moveJoint(joint.id, { x: joint.position.x, y: +e.target.value })}
-        />
-      </label>
-    </div>
-  );
+    );
+  }
+
+  return null;
 }

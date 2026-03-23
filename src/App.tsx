@@ -8,7 +8,7 @@ import { computeDOF } from './core/solver/dof';
 import { computeDriverAngle } from './core/solver/driver';
 import { angleBetween } from './core/math/vec2';
 import { SIM_DT } from './utils/constants';
-import { computeBodyTransform, localToWorld, polygonCentroid } from './core/body-transform';
+import { computeBodyTransform, localToWorld, polygonCentroid, polygonArea } from './core/body-transform';
 
 function App() {
   const initialAngleRef = useRef<number | null>(null);
@@ -41,29 +41,32 @@ function App() {
           : null;
 
         // Compute gravity weights from body outline COMs
+        // When useOutlineCOM is enabled, mass is proportional to outline area and
+        // gravity is distributed to joints based on COM position relative to joints.
         let jointGravityWeights: Map<string, number> | undefined;
         const bodiesWithCOM = Object.values(mech.bodies).filter((b) => b.useOutlineCOM);
         if (bodiesWithCOM.length > 0 && sim.gravityEnabled) {
           jointGravityWeights = new Map();
           for (const body of bodiesWithCOM) {
-            // Get world-space outline centroid
             const bodyOutlines = Object.values(mech.outlines).filter((o) => o.bodyId === body.id);
             if (bodyOutlines.length === 0) continue;
 
             const transform = computeBodyTransform(body, mech.joints);
-            // Use first outline's centroid (or merge all outline points)
             const allWorldPts = bodyOutlines.flatMap((o) => o.points.map((p) => localToWorld(p, transform)));
             const com = polygonCentroid(allWorldPts);
+
+            // Compute area-based mass multiplier (area / 1000 so it scales reasonably)
+            const area = polygonArea(allWorldPts);
+            const massMult = Math.max(0.1, area / 1000);
 
             // Find free joints in this body
             const freeIds = body.jointIds.filter((jid) => !fixedJointIds.has(jid) && mech.joints[jid]);
             if (freeIds.length < 2) {
-              // 0 or 1 free joints — just use default weight
-              for (const jid of freeIds) jointGravityWeights.set(jid, 1);
+              for (const jid of freeIds) jointGravityWeights.set(jid, massMult);
               continue;
             }
 
-            // For 2 joints: project COM onto line to get parametric t, distribute as (1-t) and t
+            // For 2 joints: project COM onto line to get parametric t, distribute mass
             if (freeIds.length === 2) {
               const pA = mech.joints[freeIds[0]].position;
               const pB = mech.joints[freeIds[1]].position;
@@ -73,12 +76,13 @@ function App() {
               if (lenSq > 1e-8) {
                 t = Math.max(0, Math.min(1, ((com.x - pA.x) * dx + (com.y - pA.y) * dy) / lenSq));
               }
-              // Scale so total weight = 2 (same as default where each gets 1)
-              jointGravityWeights.set(freeIds[0], 2 * (1 - t));
-              jointGravityWeights.set(freeIds[1], 2 * t);
+              // Distribute mass * 2 proportionally (total = 2 * massMult)
+              jointGravityWeights.set(freeIds[0], 2 * massMult * (1 - t));
+              jointGravityWeights.set(freeIds[1], 2 * massMult * t);
             } else {
-              // 3+ joints — equal distribution for now
-              for (const jid of freeIds) jointGravityWeights.set(jid, 1);
+              // 3+ joints — distribute mass equally
+              const perJoint = (freeIds.length > 0) ? (massMult * freeIds.length) / freeIds.length : massMult;
+              for (const jid of freeIds) jointGravityWeights.set(jid, perJoint);
             }
           }
         }
