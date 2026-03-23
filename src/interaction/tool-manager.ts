@@ -17,7 +17,7 @@ let dragJointId: string | null = null;
 let isPanning = false;
 let lastMouse: Vec2 = { x: 0, y: 0 };
 
-export function handleMouseDown(e: MouseEvent, canvas: HTMLCanvasElement) {
+export function handleMouseDown(e: PointerEvent, canvas: HTMLCanvasElement) {
   const editor = useEditorStore.getState();
   const mechanism = useMechanismStore.getState();
   const rect = canvas.getBoundingClientRect();
@@ -159,7 +159,7 @@ export function handleMouseDown(e: MouseEvent, canvas: HTMLCanvasElement) {
   }
 }
 
-export function handleDoubleClick(e: MouseEvent, canvas: HTMLCanvasElement) {
+export function handleDoubleClick(e: PointerEvent | MouseEvent, canvas: HTMLCanvasElement) {
   const editor = useEditorStore.getState();
   if (editor.mode !== 'create') return;
 
@@ -179,7 +179,7 @@ export function handleDoubleClick(e: MouseEvent, canvas: HTMLCanvasElement) {
   }
 }
 
-export function handleMouseMove(e: MouseEvent, canvas: HTMLCanvasElement) {
+export function handleMouseMove(e: PointerEvent, canvas: HTMLCanvasElement) {
   const editor = useEditorStore.getState();
   const mechanism = useMechanismStore.getState();
   const rect = canvas.getBoundingClientRect();
@@ -220,7 +220,7 @@ export function handleMouseMove(e: MouseEvent, canvas: HTMLCanvasElement) {
   lastMouse = screenPos;
 }
 
-export function handleMouseUp(_e: MouseEvent) {
+export function handleMouseUp(_e: PointerEvent | MouseEvent) {
   const editor = useEditorStore.getState();
 
   // Clear simulate drag
