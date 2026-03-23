@@ -4,6 +4,7 @@ export type AppMode = 'create' | 'simulate';
 export type ToolType = 'select' | 'joint' | 'link' | 'pan';
 export type JointSubType = 'revolute' | 'fixed';
 export type CreateTool = 'joints' | 'outline';
+export type JointMode = 'manual' | 'autochain';
 
 export interface SimDragState {
   active: boolean;
