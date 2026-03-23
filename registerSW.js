@@ -1,0 +1,1 @@
+if('serviceWorker' in navigator) {window.addEventListener('load', () => {navigator.serviceWorker.register('/linkage-studio/sw.js', { scope: '/linkage-studio/' })})}
