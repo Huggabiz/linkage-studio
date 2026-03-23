@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { AppMode, ToolType, JointSubType, CreateTool, CameraState, SimDragState } from '../types';
+import type { AppMode, ToolType, JointSubType, CreateTool, JointMode, CameraState, SimDragState } from '../types';
 import type { Vec2 } from '../types';
 import { DEFAULT_GRID_SIZE } from '../utils/constants';
 
@@ -19,6 +19,8 @@ interface EditorStore {
   showLinks: boolean;
   showVectors: boolean;
   createTool: CreateTool;
+  jointMode: JointMode;
+  autoChainLastBodyId: string | null;
   outlinePoints: Vec2[];
 
   setMode(mode: AppMode): void;
@@ -39,6 +41,8 @@ interface EditorStore {
   toggleShowLinks(): void;
   toggleShowVectors(): void;
   setCreateTool(tool: CreateTool): void;
+  setJointMode(mode: JointMode): void;
+  setAutoChainLastBodyId(id: string | null): void;
   addOutlinePoint(pt: Vec2): void;
   clearOutlinePoints(): void;
 }
@@ -59,10 +63,12 @@ export const useEditorStore = create<EditorStore>((set) => ({
   showLinks: true,
   showVectors: true,
   createTool: 'joints' as CreateTool,
+  jointMode: 'manual' as JointMode,
+  autoChainLastBodyId: null as string | null,
   outlinePoints: [] as Vec2[],
 
   setMode(mode) {
-    set({ mode, simDrag: null, linkStartJointId: null, selectedIds: new Set(), outlinePoints: [], createTool: 'joints' as CreateTool });
+    set({ mode, simDrag: null, linkStartJointId: null, selectedIds: new Set(), outlinePoints: [], createTool: 'joints' as CreateTool, jointMode: 'manual' as JointMode, autoChainLastBodyId: null });
   },
 
   setTool(tool) {
@@ -157,7 +163,15 @@ export const useEditorStore = create<EditorStore>((set) => ({
   },
 
   setCreateTool(tool) {
-    set({ createTool: tool, outlinePoints: [] });
+    set({ createTool: tool, outlinePoints: [], jointMode: 'manual' as JointMode, autoChainLastBodyId: null });
+  },
+
+  setJointMode(mode) {
+    set({ jointMode: mode, autoChainLastBodyId: null });
+  },
+
+  setAutoChainLastBodyId(id) {
+    set({ autoChainLastBodyId: id });
   },
 
   addOutlinePoint(pt) {

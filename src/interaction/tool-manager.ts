@@ -140,6 +140,41 @@ export function handleMouseDown(e: PointerEvent, canvas: HTMLCanvasElement) {
   }
 
   // --- JOINTS TOOL ---
+  if (editor.jointMode === 'autochain') {
+    const joint = hitTestJoint(worldPos, mechanism.joints, editor.camera.zoom);
+    if (joint) {
+      // Clicking existing joint: attach last chain body to it and end chain
+      const lastBodyId = editor.autoChainLastBodyId;
+      if (lastBodyId) {
+        mechanism.addJointToBody(joint.id, lastBodyId);
+      }
+      editor.setJointMode('manual');
+      editor.select(joint.id);
+    } else {
+      // Place a new chain joint in free space
+      const pos = editor.gridEnabled ? snapToGrid(worldPos, editor.gridSize) : worldPos;
+      const lastBodyId = editor.autoChainLastBodyId;
+
+      // Create a new body for the forward connection
+      const newBodyId = mechanism.addBody('Body');
+
+      // Determine which bodies this joint belongs to
+      let bodyIds: string[];
+      if (lastBodyId === null) {
+        // First joint in chain: Base + new body
+        bodyIds = [mechanism.baseBodyId, newBodyId];
+      } else {
+        // Subsequent joints: previous body + new body
+        bodyIds = [lastBodyId, newBodyId];
+      }
+
+      mechanism.addJoint('revolute', pos, bodyIds);
+      editor.setAutoChainLastBodyId(newBodyId);
+    }
+    return;
+  }
+
+  // --- MANUAL JOINTS ---
   const joint = hitTestJoint(worldPos, mechanism.joints, editor.camera.zoom);
   if (joint) {
     if (e.shiftKey) {
@@ -265,7 +300,9 @@ export function handleKeyDown(e: KeyboardEvent) {
     switch (e.key) {
       case 'g': editor.toggleGrid(); return;
       case 'Escape':
-        if (editor.outlinePoints.length > 0) {
+        if (editor.jointMode === 'autochain') {
+          editor.setJointMode('manual');
+        } else if (editor.outlinePoints.length > 0) {
           editor.clearOutlinePoints();
         } else {
           editor.clearSelection();

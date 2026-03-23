@@ -1,13 +1,15 @@
 import { useEditorStore } from '../../store/editor-store';
 import { useMechanismStore } from '../../store/mechanism-store';
-import type { AppMode, CreateTool } from '../../types';
+import type { AppMode, CreateTool, JointMode } from '../../types';
 import type { Vec2 } from '../../types';
 import './Toolbar.css';
 
 export function Toolbar() {
   const mode = useEditorStore((s) => s.mode);
   const createTool = useEditorStore((s) => s.createTool);
+  const jointMode = useEditorStore((s) => s.jointMode);
   const setCreateTool = useEditorStore((s) => s.setCreateTool);
+  const setJointMode = useEditorStore((s) => s.setJointMode);
   const setMode = useEditorStore((s) => s.setMode);
   const setSavedPositions = useEditorStore((s) => s.setSavedPositions);
   const savedPositions = useEditorStore((s) => s.savedPositions);
@@ -69,6 +71,22 @@ export function Toolbar() {
             >
               Joints
             </button>
+            {createTool === 'joints' && (
+              <div className="sub-tools">
+                <button
+                  className={`tool-btn sub ${jointMode === 'manual' ? 'active' : ''}`}
+                  onClick={() => setJointMode('manual')}
+                >
+                  Manual
+                </button>
+                <button
+                  className={`tool-btn sub ${jointMode === 'autochain' ? 'active' : ''}`}
+                  onClick={() => setJointMode('autochain')}
+                >
+                  Auto Chain
+                </button>
+              </div>
+            )}
             <button
               className={`tool-btn ${createTool === 'outline' ? 'active' : ''}`}
               onClick={() => setCreateTool('outline')}
@@ -84,11 +102,17 @@ export function Toolbar() {
           </div>
 
           <div className="toolbar-section">
-            {createTool === 'joints' ? (
+            {createTool === 'joints' && jointMode === 'manual' ? (
               <>
                 <div className="sim-hint">Click to add joint</div>
                 <div className="sim-hint">Click joint to select</div>
                 <div className="sim-hint">Double-click to toggle fixed</div>
+              </>
+            ) : createTool === 'joints' && jointMode === 'autochain' ? (
+              <>
+                <div className="sim-hint">Click to place chain joints</div>
+                <div className="sim-hint">Click existing joint to end chain</div>
+                <div className="sim-hint">Escape to stop</div>
               </>
             ) : (
               <>

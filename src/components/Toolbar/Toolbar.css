@@ -50,6 +50,13 @@
   color: #fff;
 }
 
+.sub-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding-left: 12px;
+}
+
 .tool-btn.sub {
   font-size: 11px;
   padding: 4px 8px;
