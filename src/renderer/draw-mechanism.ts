@@ -1,4 +1,5 @@
-import type { Joint, Link, Body } from '../types';
+import type { Joint, Link, Body, Outline, Vec2 } from '../types';
+import { computeBodyTransform, localToWorld } from '../core/body-transform';
 import {
   JOINT_RADIUS, JOINT_RADIUS_FIXED, LINK_WIDTH,
   REVOLUTE_COLOR, FIXED_COLOR, LINK_COLOR,
@@ -96,6 +97,7 @@ export function drawMechanism(
   joints: Record<string, Joint>,
   links: Record<string, Link>,
   bodies: Record<string, Body>,
+  outlines: Record<string, Outline>,
   selectedIds: Set<string>,
   hoveredId: string | null,
   zoom: number,
@@ -132,9 +134,90 @@ export function drawMechanism(
     }
   }
 
+  // Draw outlines
+  drawOutlines(ctx, Object.values(outlines), bodies, joints, zoom, selectedIds);
+
   // Draw joints with body rings
   for (const joint of Object.values(joints)) {
     const memberBodies = jointBodies.get(joint.id) || [];
     drawJoint(ctx, joint, selectedIds.has(joint.id), hoveredId === joint.id, zoom, memberBodies);
+  }
+}
+
+/** Draw all completed outlines, transformed to current body positions. */
+export function drawOutlines(
+  ctx: CanvasRenderingContext2D,
+  outlineList: Outline[],
+  bodies: Record<string, Body>,
+  joints: Record<string, Joint>,
+  zoom: number,
+  selectedIds: Set<string>,
+) {
+  for (const outline of outlineList) {
+    const body = bodies[outline.bodyId];
+    if (!body || outline.points.length < 2) continue;
+
+    const transform = computeBodyTransform(body, joints);
+    const worldPoints = outline.points.map((p) => localToWorld(p, transform));
+    const isSelected = selectedIds.has(outline.id);
+
+    ctx.beginPath();
+    ctx.moveTo(worldPoints[0].x, worldPoints[0].y);
+    for (let i = 1; i < worldPoints.length; i++) {
+      ctx.lineTo(worldPoints[i].x, worldPoints[i].y);
+    }
+    ctx.closePath();
+
+    // Fill with transparent body color
+    ctx.fillStyle = body.color + (isSelected ? '33' : '1A');
+    ctx.fill();
+
+    // Stroke
+    ctx.strokeStyle = isSelected ? SELECTION_COLOR : body.color;
+    ctx.lineWidth = (isSelected ? 3 : 2) / zoom;
+    ctx.stroke();
+  }
+}
+
+/** Draw the in-progress outline ghost (world-space points + cursor). */
+export function drawOutlineGhost(
+  ctx: CanvasRenderingContext2D,
+  points: Vec2[],
+  cursorWorld: Vec2 | null,
+  bodyColor: string,
+  zoom: number,
+) {
+  if (points.length === 0) return;
+
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < points.length; i++) {
+    ctx.lineTo(points[i].x, points[i].y);
+  }
+  if (cursorWorld) {
+    ctx.lineTo(cursorWorld.x, cursorWorld.y);
+  }
+
+  ctx.strokeStyle = bodyColor;
+  ctx.lineWidth = 2 / zoom;
+  ctx.setLineDash([6 / zoom, 4 / zoom]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Draw dots at each placed point
+  for (const p of points) {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 4 / zoom, 0, Math.PI * 2);
+    ctx.fillStyle = bodyColor;
+    ctx.fill();
+  }
+
+  // Highlight first point (close target) if 3+ points
+  if (points.length >= 3) {
+    ctx.beginPath();
+    ctx.arc(points[0].x, points[0].y, 8 / zoom, 0, Math.PI * 2);
+    ctx.strokeStyle = bodyColor;
+    ctx.lineWidth = 1.5 / zoom;
+    ctx.stroke();
   }
 }

@@ -23,6 +23,13 @@ export interface Body {
   name: string;
   color: string;
   jointIds: string[];
+  useOutlineCOM: boolean;
+}
+
+export interface Outline {
+  readonly id: string;
+  bodyId: string;
+  points: Vec2[];  // local coordinates relative to body reference frame
 }
 
 export interface MechanismState {
@@ -30,4 +37,5 @@ export interface MechanismState {
   links: Record<string, Link>;
   bodies: Record<string, Body>;
   baseBodyId: string;
+  outlines: Record<string, Outline>;
 }

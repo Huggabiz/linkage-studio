@@ -6,6 +6,7 @@ import { BODY_COLORS } from '../../utils/constants';
 export function BodyPanel() {
   const bodies = useMechanismStore((s) => s.bodies);
   const joints = useMechanismStore((s) => s.joints);
+  const outlines = useMechanismStore((s) => s.outlines);
   const baseBodyId = useMechanismStore((s) => s.baseBodyId);
   const removeBody = useMechanismStore((s) => s.removeBody);
   const renameBody = useMechanismStore((s) => s.renameBody);
@@ -13,13 +14,17 @@ export function BodyPanel() {
   const addJointToBody = useMechanismStore((s) => s.addJointToBody);
   const removeJointFromBody = useMechanismStore((s) => s.removeJointFromBody);
   const addBody = useMechanismStore((s) => s.addBody);
+  const toggleOutlineCOM = useMechanismStore((s) => s.toggleOutlineCOM);
   const activeBodyIds = useEditorStore((s) => s.activeBodyIds);
   const toggleActiveBody = useEditorStore((s) => s.toggleActiveBody);
+  const setActiveBody = useEditorStore((s) => s.setActiveBody);
   const selectedIds = useEditorStore((s) => s.selectedIds);
+  const createTool = useEditorStore((s) => s.createTool);
 
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const usedColors = new Set(Object.values(bodies).map((b) => b.color));
+  const isOutlineMode = createTool === 'outline';
 
   // Find selected joint (if any)
   const selectedJointId = [...selectedIds].find((id) => joints[id]);
@@ -31,14 +36,30 @@ export function BodyPanel() {
     return 0;
   });
 
+  // Count outlines per body
+  const outlineCount = new Map<string, number>();
+  for (const o of Object.values(outlines)) {
+    outlineCount.set(o.bodyId, (outlineCount.get(o.bodyId) || 0) + 1);
+  }
+
   return (
     <div className="panel-content">
-      <div className="panel-title">Bodies</div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div className="panel-title" style={{ margin: 0 }}>Bodies</div>
+        <button
+          className="tool-btn"
+          style={{ fontSize: 11, padding: '2px 8px' }}
+          onClick={() => addBody('Body')}
+        >
+          + Add Body
+        </button>
+      </div>
       {bodyList.map((body) => {
         const isActive = activeBodyIds.has(body.id);
         const isBase = body.id === baseBodyId;
         const isEditing = editingId === body.id;
         const jointInBody = selectedJointId ? body.jointIds.includes(selectedJointId) : false;
+        const oCount = outlineCount.get(body.id) || 0;
 
         return (
           <div
@@ -49,27 +70,38 @@ export function BodyPanel() {
               backgroundColor: isActive ? 'rgba(255,255,255,0.1)' : 'transparent',
               cursor: 'pointer',
             }}
-            onClick={() => toggleActiveBody(body.id)}
+            onClick={() => isOutlineMode ? setActiveBody(body.id) : toggleActiveBody(body.id)}
           >
-            {/* Checkbox: if joint selected → body membership; if no joint → active body for placement */}
-            <input
-              type="checkbox"
-              checked={selectedJointId ? jointInBody : isActive}
-              onChange={(e) => {
-                e.stopPropagation();
-                if (selectedJointId) {
-                  if (jointInBody) {
-                    removeJointFromBody(selectedJointId, body.id);
+            {/* Selection control: radio in outline mode, checkbox in joints mode */}
+            {isOutlineMode ? (
+              <input
+                type="radio"
+                name="activeBody"
+                checked={isActive}
+                onChange={() => setActiveBody(body.id)}
+                onClick={(e) => e.stopPropagation()}
+                style={{ flexShrink: 0, cursor: 'pointer' }}
+              />
+            ) : (
+              <input
+                type="checkbox"
+                checked={selectedJointId ? jointInBody : isActive}
+                onChange={(e) => {
+                  e.stopPropagation();
+                  if (selectedJointId) {
+                    if (jointInBody) {
+                      removeJointFromBody(selectedJointId, body.id);
+                    } else {
+                      addJointToBody(selectedJointId, body.id);
+                    }
                   } else {
-                    addJointToBody(selectedJointId, body.id);
+                    toggleActiveBody(body.id);
                   }
-                } else {
-                  toggleActiveBody(body.id);
-                }
-              }}
-              onClick={(e) => e.stopPropagation()}
-              style={{ flexShrink: 0, cursor: 'pointer' }}
-            />
+                }}
+                onClick={(e) => e.stopPropagation()}
+                style={{ flexShrink: 0, cursor: 'pointer' }}
+              />
+            )}
 
             {/* Color swatch */}
             <span
@@ -89,7 +121,7 @@ export function BodyPanel() {
               title={isBase ? 'Base body color' : 'Click to change color'}
             />
 
-            {/* Name — editable only when edit mode is active */}
+            {/* Name */}
             {isEditing ? (
               <input
                 autoFocus
@@ -109,10 +141,25 @@ export function BodyPanel() {
               </span>
             )}
 
-            {/* Joint count */}
-            <span style={{ fontSize: 10, opacity: 0.6 }}>{body.jointIds.length}j</span>
+            {/* Counts + COM toggle */}
+            <span style={{ fontSize: 10, opacity: 0.6 }}>
+              {body.jointIds.length}j{oCount > 0 ? ` ${oCount}o` : ''}
+            </span>
+            {oCount > 0 && (
+              <span
+                title={body.useOutlineCOM ? 'Using outline center of area for gravity' : 'Using joint centroid for gravity'}
+                style={{
+                  fontSize: 9, padding: '0 3px', borderRadius: 2, cursor: 'pointer',
+                  backgroundColor: body.useOutlineCOM ? 'rgba(76,175,80,0.3)' : 'rgba(255,255,255,0.05)',
+                  color: body.useOutlineCOM ? '#4CAF50' : 'inherit',
+                }}
+                onClick={(e) => { e.stopPropagation(); toggleOutlineCOM(body.id); }}
+              >
+                CoA
+              </span>
+            )}
 
-            {/* Edit + Delete buttons (not for base) */}
+            {/* Edit + Delete */}
             {!isBase && !isEditing && (
               <button
                 className="tool-btn"
@@ -137,23 +184,6 @@ export function BodyPanel() {
         );
       })}
 
-      {/* Add body button at bottom */}
-      <button
-        className="tool-btn"
-        style={{ marginTop: 4, width: '100%', textAlign: 'center' }}
-        onClick={() => addBody('Body')}
-      >
-        + Add Body
-      </button>
-
-      <label style={{ marginTop: 8, fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-        <input
-          type="checkbox"
-          checked={useEditorStore((s) => s.showLinks)}
-          onChange={() => useEditorStore.getState().toggleShowLinks()}
-        />
-        Show links
-      </label>
     </div>
   );
 }

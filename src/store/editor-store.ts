@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { AppMode, ToolType, JointSubType, CameraState, SimDragState } from '../types';
+import type { AppMode, ToolType, JointSubType, CreateTool, CameraState, SimDragState } from '../types';
 import type { Vec2 } from '../types';
 import { DEFAULT_GRID_SIZE } from '../utils/constants';
 
@@ -17,6 +17,9 @@ interface EditorStore {
   savedPositions: Record<string, Vec2> | null;
   activeBodyIds: Set<string>;
   showLinks: boolean;
+  showVectors: boolean;
+  createTool: CreateTool;
+  outlinePoints: Vec2[];
 
   setMode(mode: AppMode): void;
   setTool(tool: ToolType): void;
@@ -34,6 +37,10 @@ interface EditorStore {
   toggleActiveBody(id: string): void;
   setActiveBody(id: string): void;
   toggleShowLinks(): void;
+  toggleShowVectors(): void;
+  setCreateTool(tool: CreateTool): void;
+  addOutlinePoint(pt: Vec2): void;
+  clearOutlinePoints(): void;
 }
 
 export const useEditorStore = create<EditorStore>((set) => ({
@@ -50,9 +57,12 @@ export const useEditorStore = create<EditorStore>((set) => ({
   savedPositions: null,
   activeBodyIds: new Set(['base']),
   showLinks: true,
+  showVectors: true,
+  createTool: 'joints' as CreateTool,
+  outlinePoints: [] as Vec2[],
 
   setMode(mode) {
-    set({ mode, simDrag: null, linkStartJointId: null, selectedIds: new Set() });
+    set({ mode, simDrag: null, linkStartJointId: null, selectedIds: new Set(), outlinePoints: [], createTool: 'joints' as CreateTool });
   },
 
   setTool(tool) {
@@ -140,5 +150,21 @@ export const useEditorStore = create<EditorStore>((set) => ({
 
   toggleShowLinks() {
     set((s) => ({ showLinks: !s.showLinks }));
+  },
+
+  toggleShowVectors() {
+    set((s) => ({ showVectors: !s.showVectors }));
+  },
+
+  setCreateTool(tool) {
+    set({ createTool: tool, outlinePoints: [] });
+  },
+
+  addOutlinePoint(pt) {
+    set((s) => ({ outlinePoints: [...s.outlinePoints, pt] }));
+  },
+
+  clearOutlinePoints() {
+    set({ outlinePoints: [] });
   },
 }));

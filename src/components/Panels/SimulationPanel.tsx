@@ -96,6 +96,28 @@ export function SimulationPanel() {
     </>
   );
 
+  const viewSection = (
+    <>
+      <div className="panel-title" style={{ marginTop: 8 }}>View</div>
+      <label style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <input
+          type="checkbox"
+          checked={useEditorStore((s) => s.showLinks)}
+          onChange={() => useEditorStore.getState().toggleShowLinks()}
+        />
+        Show links
+      </label>
+      <label style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <input
+          type="checkbox"
+          checked={useEditorStore((s) => s.showVectors)}
+          onChange={() => useEditorStore.getState().toggleShowVectors()}
+        />
+        Show vectors
+      </label>
+    </>
+  );
+
   if (mode === 'simulate') {
     return (
       <div className="panel-content">
@@ -122,6 +144,8 @@ export function SimulationPanel() {
           />
           <span>{speed.toFixed(1)}x</span>
         </label>
+
+        {viewSection}
       </div>
     );
   }
@@ -188,6 +212,8 @@ export function SimulationPanel() {
       ) : (
         <div className="panel-info">Select a joint connected to ground to set a driver</div>
       )}
+
+      {viewSection}
     </div>
   );
 }

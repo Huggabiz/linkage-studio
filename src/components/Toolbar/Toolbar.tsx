@@ -1,11 +1,13 @@
 import { useEditorStore } from '../../store/editor-store';
 import { useMechanismStore } from '../../store/mechanism-store';
-import type { AppMode } from '../../types';
+import type { AppMode, CreateTool } from '../../types';
 import type { Vec2 } from '../../types';
 import './Toolbar.css';
 
 export function Toolbar() {
   const mode = useEditorStore((s) => s.mode);
+  const createTool = useEditorStore((s) => s.createTool);
+  const setCreateTool = useEditorStore((s) => s.setCreateTool);
   const setMode = useEditorStore((s) => s.setMode);
   const setSavedPositions = useEditorStore((s) => s.setSavedPositions);
   const savedPositions = useEditorStore((s) => s.savedPositions);
@@ -24,7 +26,6 @@ export function Toolbar() {
         positions[id] = { ...joint.position };
       }
       setSavedPositions(positions);
-      // Regenerate links so rest lengths match current (possibly dragged) positions
       regenerateLinks();
     } else {
       if (savedPositions) {
@@ -34,7 +35,6 @@ export function Toolbar() {
           }
         }
         setSavedPositions(null);
-        // Regenerate links to restore original rest lengths
         regenerateLinks();
       }
     }
@@ -62,14 +62,41 @@ export function Toolbar() {
       {mode === 'create' ? (
         <>
           <div className="toolbar-section">
+            <div className="toolbar-label">Tools</div>
+            <button
+              className={`tool-btn ${createTool === 'joints' ? 'active' : ''}`}
+              onClick={() => setCreateTool('joints')}
+            >
+              Joints
+            </button>
+            <button
+              className={`tool-btn ${createTool === 'outline' ? 'active' : ''}`}
+              onClick={() => setCreateTool('outline')}
+            >
+              Outline
+            </button>
+          </div>
+
+          <div className="toolbar-section">
             <div className="toolbar-label">Edit</div>
             <button className="tool-btn" onClick={undo} title="Undo (Ctrl+Z)">Undo</button>
             <button className="tool-btn" onClick={redo} title="Redo (Ctrl+Y)">Redo</button>
           </div>
+
           <div className="toolbar-section">
-            <div className="sim-hint">Click to add joint</div>
-            <div className="sim-hint">Click joint to select</div>
-            <div className="sim-hint">Double-click to toggle fixed</div>
+            {createTool === 'joints' ? (
+              <>
+                <div className="sim-hint">Click to add joint</div>
+                <div className="sim-hint">Click joint to select</div>
+                <div className="sim-hint">Double-click to toggle fixed</div>
+              </>
+            ) : (
+              <>
+                <div className="sim-hint">Click to place outline points</div>
+                <div className="sim-hint">Click first point to close</div>
+                <div className="sim-hint">Escape to cancel</div>
+              </>
+            )}
           </div>
         </>
       ) : (

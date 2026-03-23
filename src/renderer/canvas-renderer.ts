@@ -1,7 +1,7 @@
-import type { Joint, Link, Body, Vec2, SimDragState, AppMode, ForceVector } from '../types';
+import type { Joint, Link, Body, Outline, Vec2, SimDragState, AppMode, ForceVector, CreateTool } from '../types';
 import type { CameraState } from '../types';
 import { applyCamera, resetCamera } from './camera';
-import { drawMechanism } from './draw-mechanism';
+import { drawMechanism, drawOutlineGhost } from './draw-mechanism';
 import { drawGrid, drawPathTraces, drawForceVectors, drawDragInteraction, drawModeBadge, drawHUD, clearCanvas } from './draw-overlays';
 import { lerp } from '../core/math/vec2';
 
@@ -9,6 +9,7 @@ export interface RenderState {
   joints: Record<string, Joint>;
   links: Record<string, Link>;
   bodies: Record<string, Body>;
+  outlines: Record<string, Outline>;
   selectedIds: Set<string>;
   hoveredId: string | null;
   camera: CameraState;
@@ -21,6 +22,10 @@ export interface RenderState {
   mode: AppMode;
   forceVectors: ForceVector[];
   showLinks: boolean;
+  showVectors: boolean;
+  createTool: CreateTool;
+  outlinePoints: Vec2[];
+  activeBodyColor: string;
 }
 
 export function render(
@@ -38,11 +43,16 @@ export function render(
     drawGrid(ctx, state.camera, w, h, state.gridSize);
   }
 
-  drawMechanism(ctx, state.joints, state.links, state.bodies, state.selectedIds, state.hoveredId, state.camera.zoom, state.showLinks);
+  drawMechanism(ctx, state.joints, state.links, state.bodies, state.outlines, state.selectedIds, state.hoveredId, state.camera.zoom, state.showLinks);
 
   drawPathTraces(ctx, state.pathTraces, state.camera.zoom);
 
-  if (state.mode === 'simulate' && state.forceVectors.length > 0) {
+  // Outline ghost (in-progress drawing)
+  if (state.mode === 'create' && state.createTool === 'outline' && state.outlinePoints.length > 0) {
+    drawOutlineGhost(ctx, state.outlinePoints, state.cursorWorld, state.activeBodyColor, state.camera.zoom);
+  }
+
+  if (state.mode === 'simulate' && state.forceVectors.length > 0 && state.showVectors) {
     drawForceVectors(ctx, state.forceVectors, state.camera.zoom);
   }
 

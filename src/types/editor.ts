@@ -3,6 +3,7 @@ import type { Vec2 } from './geometry';
 export type AppMode = 'create' | 'simulate';
 export type ToolType = 'select' | 'joint' | 'link' | 'pan';
 export type JointSubType = 'revolute' | 'fixed';
+export type CreateTool = 'joints' | 'outline';
 
 export interface SimDragState {
   active: boolean;

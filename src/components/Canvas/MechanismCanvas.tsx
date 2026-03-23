@@ -36,6 +36,7 @@ export function MechanismCanvas() {
       joints: mechanism.joints,
       links: mechanism.links,
       bodies: mechanism.bodies,
+      outlines: mechanism.outlines,
       selectedIds: editor.selectedIds,
       hoveredId: editor.hoveredId,
       camera: editor.camera,
@@ -48,6 +49,13 @@ export function MechanismCanvas() {
       mode: editor.mode,
       forceVectors: sim.solverResult?.forceVectors || [],
       showLinks: editor.showLinks,
+      showVectors: editor.showVectors,
+      createTool: editor.createTool,
+      outlinePoints: editor.outlinePoints,
+      activeBodyColor: (() => {
+        const activeId = [...editor.activeBodyIds][0];
+        return activeId && mechanism.bodies[activeId] ? mechanism.bodies[activeId].color : '#888888';
+      })(),
     });
 
     rafRef.current = requestAnimationFrame(renderLoop);

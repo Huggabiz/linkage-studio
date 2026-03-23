@@ -172,6 +172,7 @@ export function solveWithForce(
   dragDamping: number,
   dt: number,
   fixedJointIds?: Set<string>,
+  jointGravityWeights?: Map<string, number>,
 ): SolverResult {
   const freeJoints: Joint[] = [];
   const jointIndex = new Map<string, number>();
@@ -191,21 +192,32 @@ export function solveWithForce(
 
   const linkArray = Object.values(links);
 
-  // --- Precompute constant gravity acceleration per joint (position-independent) ---
+  // --- Precompute constant gravity acceleration per joint ---
+  // jointGravityWeights: per-joint multiplier for gravity. Default (no weights) = equal distribution.
+  // Custom weights allow shifting effective COM (e.g. from outline center of area).
   const gravAccX = new Float64Array(freeJoints.length);
   const gravAccY = new Float64Array(freeJoints.length);
 
   if (gravity.enabled) {
-    for (const link of linkArray) {
-      const jA = joints[link.jointIds[0]];
-      const jB = joints[link.jointIds[1]];
-      if (!jA || !jB) continue;
-
-      const g = gravity.strength;
-      const idxA = jointIndex.get(jA.id);
-      const idxB = jointIndex.get(jB.id);
-      if (idxA !== undefined) gravAccY[idxA / 2] += g;
-      if (idxB !== undefined) gravAccY[idxB / 2] += g;
+    const g = gravity.strength;
+    if (jointGravityWeights && jointGravityWeights.size > 0) {
+      // Use provided weights
+      for (const fj of freeJoints) {
+        const idx = jointIndex.get(fj.id)!;
+        const weight = jointGravityWeights.get(fj.id) ?? 1;
+        gravAccY[idx / 2] += g * weight;
+      }
+    } else {
+      // Default: per-link distribution (each endpoint gets g)
+      for (const link of linkArray) {
+        const jA = joints[link.jointIds[0]];
+        const jB = joints[link.jointIds[1]];
+        if (!jA || !jB) continue;
+        const idxA = jointIndex.get(jA.id);
+        const idxB = jointIndex.get(jB.id);
+        if (idxA !== undefined) gravAccY[idxA / 2] += g;
+        if (idxB !== undefined) gravAccY[idxB / 2] += g;
+      }
     }
   }
 
@@ -369,8 +381,12 @@ export function solveWithForce(
     const posBy = idxB !== undefined ? q[idxB + 1] : jB.position.y;
 
     if (gravity.enabled) {
-      const comX = (posAx + posBx) / 2;
-      const comY = (posAy + posBy) / 2;
+      // Compute effective COM based on gravity weights
+      const wA = jointGravityWeights?.get(jA.id) ?? 1;
+      const wB = jointGravityWeights?.get(jB.id) ?? 1;
+      const totalW = wA + wB;
+      const comX = totalW > 0 ? (posAx * wA + posBx * wB) / totalW : (posAx + posBx) / 2;
+      const comY = totalW > 0 ? (posAy * wA + posBy * wB) / totalW : (posAy + posBy) / 2;
       forceVectors.push({
         origin: { x: comX, y: comY },
         force: { x: 0, y: link.mass * gravity.strength * 0.03 },

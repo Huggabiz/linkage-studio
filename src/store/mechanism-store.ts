@@ -1,8 +1,9 @@
 import { create } from 'zustand';
-import type { Joint, Link, Body, JointType } from '../types';
+import type { Joint, Link, Body, Outline, JointType } from '../types';
 import type { Vec2 } from '../types';
 import { createId } from '../utils/id';
 import { generateBodyLinks } from '../core/body-links';
+import { computeBodyTransform, localToWorld, worldToLocal } from '../core/body-transform';
 import { BASE_BODY_COLOR, BODY_COLORS } from '../utils/constants';
 
 interface HistorySnapshot {
@@ -10,12 +11,13 @@ interface HistorySnapshot {
   links: Record<string, Link>;
   bodies: Record<string, Body>;
   baseBodyId: string;
+  outlines: Record<string, Outline>;
 }
 
 const BASE_BODY_ID = 'base';
 
 function createBaseBody(): Body {
-  return { id: BASE_BODY_ID, name: 'Base', color: BASE_BODY_COLOR, jointIds: [] };
+  return { id: BASE_BODY_ID, name: 'Base', color: BASE_BODY_COLOR, jointIds: [], useOutlineCOM: false };
 }
 
 interface MechanismStore {
@@ -23,6 +25,7 @@ interface MechanismStore {
   links: Record<string, Link>;
   bodies: Record<string, Body>;
   baseBodyId: string;
+  outlines: Record<string, Outline>;
 
   past: HistorySnapshot[];
   future: HistorySnapshot[];
@@ -42,6 +45,10 @@ interface MechanismStore {
   removeJointFromBody(jointId: string, bodyId: string): void;
   regenerateLinks(): void;
 
+  addOutline(bodyId: string, localPoints: Vec2[]): string;
+  removeOutline(id: string): void;
+  toggleOutlineCOM(bodyId: string): void;
+
   pushHistory(): void;
   undo(): void;
   redo(): void;
@@ -52,19 +59,20 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
   links: {},
   bodies: { [BASE_BODY_ID]: createBaseBody() },
   baseBodyId: BASE_BODY_ID,
+  outlines: {},
   past: [],
   future: [],
 
   pushHistory() {
-    const { joints, links, bodies, baseBodyId, past } = get();
+    const { joints, links, bodies, baseBodyId, outlines, past } = get();
     set({
-      past: [...past.slice(-50), { joints: { ...joints }, links: { ...links }, bodies: { ...bodies }, baseBodyId }],
+      past: [...past.slice(-50), { joints: { ...joints }, links: { ...links }, bodies: { ...bodies }, baseBodyId, outlines: { ...outlines } }],
       future: [],
     });
   },
 
   undo() {
-    const { past, joints, links, bodies, baseBodyId } = get();
+    const { past, joints, links, bodies, baseBodyId, outlines } = get();
     if (past.length === 0) return;
     const prev = past[past.length - 1];
     set({
@@ -72,13 +80,14 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
       links: prev.links,
       bodies: prev.bodies,
       baseBodyId: prev.baseBodyId,
+      outlines: prev.outlines,
       past: past.slice(0, -1),
-      future: [{ joints: { ...joints }, links: { ...links }, bodies: { ...bodies }, baseBodyId }, ...get().future],
+      future: [{ joints: { ...joints }, links: { ...links }, bodies: { ...bodies }, baseBodyId, outlines: { ...outlines } }, ...get().future],
     });
   },
 
   redo() {
-    const { future, joints, links, bodies, baseBodyId } = get();
+    const { future, joints, links, bodies, baseBodyId, outlines } = get();
     if (future.length === 0) return;
     const next = future[0];
     set({
@@ -86,8 +95,9 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
       links: next.links,
       bodies: next.bodies,
       baseBodyId: next.baseBodyId,
+      outlines: next.outlines,
       future: future.slice(1),
-      past: [...get().past, { joints: { ...joints }, links: { ...links }, bodies: { ...bodies }, baseBodyId }],
+      past: [...get().past, { joints: { ...joints }, links: { ...links }, bodies: { ...bodies }, baseBodyId, outlines: { ...outlines } }],
     });
   },
 
@@ -100,11 +110,15 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
     const newJoints = { ...get().joints, [id]: joint };
     const newBodies = { ...get().bodies };
 
-    // Add to specified bodies
+    // Add to specified bodies, reprojecting outlines to preserve world positions
+    const oldBodies = get().bodies;
+    const newOutlines = { ...get().outlines };
     if (bodyIds) {
       for (const bodyId of bodyIds) {
         if (newBodies[bodyId]) {
+          const oldBody = oldBodies[bodyId];
           newBodies[bodyId] = { ...newBodies[bodyId], jointIds: [...newBodies[bodyId].jointIds, id] };
+          reprojectOutlines(newOutlines, bodyId, oldBody, newBodies[bodyId], get().joints, newJoints);
         }
       }
     }
@@ -119,20 +133,26 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
     const newLinks = buildLinksRecord(generateBodyLinks(newBodies, newJoints));
     updateJointConnections(newJoints, newLinks);
 
-    set({ joints: newJoints, links: newLinks, bodies: newBodies });
+    set({ joints: newJoints, links: newLinks, bodies: newBodies, outlines: newOutlines });
     return id;
   },
 
   removeJoint(id) {
     get().pushHistory();
-    const newJoints = { ...get().joints };
-    const newBodies = { ...get().bodies };
+    const oldBodies = get().bodies;
+    const oldJoints = get().joints;
+    const newJoints = { ...oldJoints };
+    const newBodies = { ...oldBodies };
+    const newOutlines = { ...get().outlines };
 
-    // Remove joint from all bodies
+    // Remove joint from all bodies, reprojecting outlines
     for (const bodyId of Object.keys(newBodies)) {
       const body = newBodies[bodyId];
       if (body.jointIds.includes(id)) {
+        const oldBody = oldBodies[bodyId];
         newBodies[bodyId] = { ...body, jointIds: body.jointIds.filter((jid) => jid !== id) };
+        delete newJoints[id];
+        reprojectOutlines(newOutlines, bodyId, oldBody, newBodies[bodyId], oldJoints, newJoints);
       }
     }
 
@@ -142,7 +162,7 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
     const newLinks = buildLinksRecord(generateBodyLinks(newBodies, newJoints));
     updateJointConnections(newJoints, newLinks);
 
-    set({ joints: newJoints, links: newLinks, bodies: newBodies });
+    set({ joints: newJoints, links: newLinks, bodies: newBodies, outlines: newOutlines });
   },
 
   moveJoint(id, position) {
@@ -227,7 +247,7 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
     const existingNames = new Set(Object.values(get().bodies).map((b) => b.name));
     let num = 1;
     while (existingNames.has(`${name} ${num}`)) num++;
-    const body: Body = { id, name: `${name} ${num}`, color, jointIds: [] };
+    const body: Body = { id, name: `${name} ${num}`, color, jointIds: [], useOutlineCOM: false };
     set((s) => ({ bodies: { ...s.bodies, [id]: body } }));
     return id;
   },
@@ -244,7 +264,13 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
     syncJointTypes(newJoints, newBodies, get().baseBodyId);
     updateJointConnections(newJoints, newLinks);
 
-    set({ bodies: newBodies, joints: newJoints, links: newLinks });
+    // Remove associated outlines
+    const newOutlines = { ...get().outlines };
+    for (const [oid, outline] of Object.entries(newOutlines)) {
+      if (outline.bodyId === id) delete newOutlines[oid];
+    }
+
+    set({ bodies: newBodies, joints: newJoints, links: newLinks, outlines: newOutlines });
   },
 
   renameBody(id, name) {
@@ -265,32 +291,38 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
 
   addJointToBody(jointId, bodyId) {
     get().pushHistory();
-    const newBodies = { ...get().bodies };
+    const oldBodies = get().bodies;
+    const newBodies = { ...oldBodies };
     const body = newBodies[bodyId];
     if (!body || body.jointIds.includes(jointId)) return;
     newBodies[bodyId] = { ...body, jointIds: [...body.jointIds, jointId] };
 
     const newJoints = { ...get().joints };
+    const newOutlines = { ...get().outlines };
+    reprojectOutlines(newOutlines, bodyId, oldBodies[bodyId], newBodies[bodyId], get().joints, newJoints);
     syncJointTypes(newJoints, newBodies, get().baseBodyId);
     const newLinks = buildLinksRecord(generateBodyLinks(newBodies, newJoints));
     updateJointConnections(newJoints, newLinks);
 
-    set({ bodies: newBodies, joints: newJoints, links: newLinks });
+    set({ bodies: newBodies, joints: newJoints, links: newLinks, outlines: newOutlines });
   },
 
   removeJointFromBody(jointId, bodyId) {
     get().pushHistory();
-    const newBodies = { ...get().bodies };
+    const oldBodies = get().bodies;
+    const newBodies = { ...oldBodies };
     const body = newBodies[bodyId];
     if (!body) return;
     newBodies[bodyId] = { ...body, jointIds: body.jointIds.filter((id) => id !== jointId) };
 
     const newJoints = { ...get().joints };
+    const newOutlines = { ...get().outlines };
+    reprojectOutlines(newOutlines, bodyId, oldBodies[bodyId], newBodies[bodyId], get().joints, newJoints);
     syncJointTypes(newJoints, newBodies, get().baseBodyId);
     const newLinks = buildLinksRecord(generateBodyLinks(newBodies, newJoints));
     updateJointConnections(newJoints, newLinks);
 
-    set({ bodies: newBodies, joints: newJoints, links: newLinks });
+    set({ bodies: newBodies, joints: newJoints, links: newLinks, outlines: newOutlines });
   },
 
   regenerateLinks() {
@@ -300,6 +332,31 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
     const newLinks = buildLinksRecord(generateBodyLinks(bodies, newJoints));
     updateJointConnections(newJoints, newLinks);
     set({ joints: newJoints, links: newLinks });
+  },
+
+  addOutline(bodyId, localPoints) {
+    const id = createId();
+    get().pushHistory();
+    const outline: Outline = { id, bodyId, points: localPoints };
+    set((s) => ({ outlines: { ...s.outlines, [id]: outline } }));
+    return id;
+  },
+
+  removeOutline(id) {
+    get().pushHistory();
+    set((s) => {
+      const newOutlines = { ...s.outlines };
+      delete newOutlines[id];
+      return { outlines: newOutlines };
+    });
+  },
+
+  toggleOutlineCOM(bodyId) {
+    set((s) => {
+      const body = s.bodies[bodyId];
+      if (!body) return s;
+      return { bodies: { ...s.bodies, [bodyId]: { ...body, useOutlineCOM: !body.useOutlineCOM } } };
+    });
   },
 }));
 
@@ -337,5 +394,29 @@ function syncJointTypes(
     if (joints[id].type !== (shouldBeFixed ? 'fixed' : 'revolute')) {
       joints[id] = { ...joints[id], type: shouldBeFixed ? 'fixed' : 'revolute' };
     }
+  }
+}
+
+/**
+ * Reproject outlines for a body when its joints change.
+ * Converts local points to world using the OLD transform, then back to local using the NEW transform.
+ * This preserves the world-space positions of the outline.
+ */
+function reprojectOutlines(
+  outlines: Record<string, Outline>,
+  bodyId: string,
+  oldBody: Body,
+  newBody: Body,
+  oldJoints: Record<string, Joint>,
+  newJoints: Record<string, Joint>,
+) {
+  const oldTransform = computeBodyTransform(oldBody, oldJoints);
+  const newTransform = computeBodyTransform(newBody, newJoints);
+
+  for (const id of Object.keys(outlines)) {
+    if (outlines[id].bodyId !== bodyId) continue;
+    const worldPts = outlines[id].points.map((p) => localToWorld(p, oldTransform));
+    const newLocalPts = worldPts.map((p) => worldToLocal(p, newTransform));
+    outlines[id] = { ...outlines[id], points: newLocalPts };
   }
 }

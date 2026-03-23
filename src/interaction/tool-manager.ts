@@ -1,9 +1,11 @@
 import type { Vec2 } from '../types';
 import { useEditorStore } from '../store/editor-store';
 import { useMechanismStore } from '../store/mechanism-store';
-import { hitTest, hitTestJoint } from './hit-test';
+import { hitTest, hitTestJoint, hitTestOutline } from './hit-test';
 import { screenToWorld } from '../renderer/camera';
 import { snapToGrid, distance, sub, dot, lengthSq } from '../core/math/vec2';
+import { computeBodyTransform, worldToLocal } from '../core/body-transform';
+import { HIT_RADIUS } from '../utils/constants';
 
 function isFixed(jointId: string): boolean {
   const { bodies, baseBodyId } = useMechanismStore.getState();
@@ -96,7 +98,48 @@ export function handleMouseDown(e: MouseEvent, canvas: HTMLCanvasElement) {
     return;
   }
 
-  // Unified click: hit joint = select/drag, empty space = deselect or create
+  // --- OUTLINE TOOL ---
+  if (editor.createTool === 'outline') {
+    const pos = editor.gridEnabled ? snapToGrid(worldPos, editor.gridSize) : worldPos;
+    const points = editor.outlinePoints;
+
+    // If not currently drawing, check if clicking on an existing outline to select it
+    if (points.length === 0) {
+      const hitOutline = hitTestOutline(worldPos, mechanism.outlines, mechanism.bodies, mechanism.joints, editor.camera.zoom);
+      if (hitOutline) {
+        editor.select(hitOutline.id);
+        return;
+      }
+      // Clicked empty space — deselect any selected outline
+      if (editor.selectedIds.size > 0) {
+        editor.clearSelection();
+        return;
+      }
+    }
+
+    // If clicking near the first point and we have 3+ points, close the outline
+    if (points.length >= 3) {
+      const distToFirst = distance(pos, points[0]);
+      const closeThreshold = HIT_RADIUS / editor.camera.zoom;
+      if (distToFirst < closeThreshold) {
+        const activeBodyId = [...editor.activeBodyIds][0];
+        const body = mechanism.bodies[activeBodyId];
+        if (body) {
+          const transform = computeBodyTransform(body, mechanism.joints);
+          const localPoints = points.map((p) => worldToLocal(p, transform));
+          mechanism.addOutline(activeBodyId, localPoints);
+        }
+        editor.clearOutlinePoints();
+        return;
+      }
+    }
+
+    // Add point
+    editor.addOutlinePoint(pos);
+    return;
+  }
+
+  // --- JOINTS TOOL ---
   const joint = hitTestJoint(worldPos, mechanism.joints, editor.camera.zoom);
   if (joint) {
     if (e.shiftKey) {
@@ -108,10 +151,8 @@ export function handleMouseDown(e: MouseEvent, canvas: HTMLCanvasElement) {
     dragJointId = joint.id;
     mechanism.pushHistory();
   } else if (editor.selectedIds.size > 0) {
-    // A joint is selected — just deselect, don't create
     editor.clearSelection();
   } else {
-    // Nothing selected — create a new joint
     const pos = editor.gridEnabled ? snapToGrid(worldPos, editor.gridSize) : worldPos;
     const activeBodyIds = Array.from(editor.activeBodyIds);
     mechanism.addJoint('revolute', pos, activeBodyIds);
@@ -224,7 +265,11 @@ export function handleKeyDown(e: KeyboardEvent) {
     switch (e.key) {
       case 'g': editor.toggleGrid(); return;
       case 'Escape':
-        editor.clearSelection();
+        if (editor.outlinePoints.length > 0) {
+          editor.clearOutlinePoints();
+        } else {
+          editor.clearSelection();
+        }
         return;
     }
   }
@@ -232,6 +277,7 @@ export function handleKeyDown(e: KeyboardEvent) {
   if (e.key === 'Delete' || e.key === 'Backspace') {
     for (const id of editor.selectedIds) {
       if (mechanism.joints[id]) mechanism.removeJoint(id);
+      else if (mechanism.outlines[id]) mechanism.removeOutline(id);
     }
     editor.clearSelection();
   }
