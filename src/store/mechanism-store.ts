@@ -49,6 +49,8 @@ interface MechanismStore {
   removeOutline(id: string): void;
   toggleOutlineCOM(bodyId: string): void;
 
+  clearAll(): void;
+  loadState(state: { joints: Record<string, Joint>; links: Record<string, Link>; bodies: Record<string, Body>; baseBodyId: string; outlines: Record<string, Outline> }): void;
   pushHistory(): void;
   undo(): void;
   redo(): void;
@@ -62,6 +64,30 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
   outlines: {},
   past: [],
   future: [],
+
+  clearAll() {
+    set({
+      joints: {},
+      links: {},
+      bodies: { [BASE_BODY_ID]: createBaseBody() },
+      baseBodyId: BASE_BODY_ID,
+      outlines: {},
+      past: [],
+      future: [],
+    });
+  },
+
+  loadState(state) {
+    set({
+      joints: state.joints,
+      links: state.links,
+      bodies: state.bodies,
+      baseBodyId: state.baseBodyId,
+      outlines: state.outlines,
+      past: [],
+      future: [],
+    });
+  },
 
   pushHistory() {
     const { joints, links, bodies, baseBodyId, outlines, past } = get();

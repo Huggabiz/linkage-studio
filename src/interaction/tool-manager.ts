@@ -1,7 +1,7 @@
 import type { Vec2 } from '../types';
 import { useEditorStore } from '../store/editor-store';
 import { useMechanismStore } from '../store/mechanism-store';
-import { hitTest, hitTestJoint, hitTestOutline } from './hit-test';
+import { hitTest, hitTestJoint, hitTestOutline, hitTestOutlineFilled } from './hit-test';
 import { screenToWorld } from '../renderer/camera';
 import { snapToGrid, distance, sub, dot, lengthSq } from '../core/math/vec2';
 import { computeBodyTransform, worldToLocal } from '../core/body-transform';
@@ -85,6 +85,45 @@ export function handleMouseDown(e: PointerEvent, canvas: HTMLCanvasElement) {
           linkId: link.id,
           grabT: t,
         });
+      }
+      return;
+    }
+
+    // Outline (shape) hit: only non-overlapping, non-base body shapes
+    const outlineHit = hitTestOutlineFilled(
+      worldPos, mechanism.outlines, mechanism.bodies, mechanism.joints, mechanism.baseBodyId,
+    );
+    if (outlineHit) {
+      const body = mechanism.bodies[outlineHit.bodyId];
+      if (body) {
+        // Find the closest non-fixed joint in this body
+        let bestJointId: string | null = null;
+        let bestDist = Infinity;
+        for (const jid of body.jointIds) {
+          if (isFixed(jid)) continue;
+          const j = mechanism.joints[jid];
+          if (!j) continue;
+          const d = distance(worldPos, j.position);
+          if (d < bestDist) { bestDist = d; bestJointId = jid; }
+        }
+        if (bestJointId) {
+          // Find a link connected to this joint
+          const joint = mechanism.joints[bestJointId];
+          const linkId = joint.connectedLinkIds[0] || null;
+          let grabT = 0;
+          if (linkId) {
+            const link = mechanism.links[linkId];
+            if (link) grabT = link.jointIds[0] === bestJointId ? 0 : 1;
+          }
+          editor.setSimDrag({
+            active: true,
+            grabPoint: worldPos,
+            cursorPoint: worldPos,
+            jointId: bestJointId,
+            linkId,
+            grabT,
+          });
+        }
       }
     }
     return;

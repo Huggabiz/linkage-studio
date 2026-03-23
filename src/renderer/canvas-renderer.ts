@@ -2,8 +2,9 @@ import type { Joint, Link, Body, Outline, Vec2, SimDragState, AppMode, ForceVect
 import type { CameraState } from '../types';
 import { applyCamera, resetCamera } from './camera';
 import { drawMechanism, drawOutlineGhost } from './draw-mechanism';
-import { drawGrid, drawPathTraces, drawForceVectors, drawDragInteraction, drawModeBadge, drawHUD, clearCanvas } from './draw-overlays';
+import { drawGrid, drawPathTraces, drawForceVectors, drawDragInteraction, drawModeBadge, drawHUD, clearCanvas, drawCOMMarkers } from './draw-overlays';
 import { lerp } from '../core/math/vec2';
+import { computeBodyTransform, localToWorld, polygonCentroid } from '../core/body-transform';
 
 export interface RenderState {
   joints: Record<string, Joint>;
@@ -26,6 +27,8 @@ export interface RenderState {
   createTool: CreateTool;
   outlinePoints: Vec2[];
   activeBodyColor: string;
+  gravityEnabled: boolean;
+  gravityStrength: number;
 }
 
 export function render(
@@ -54,6 +57,26 @@ export function render(
 
   if (state.mode === 'simulate' && state.forceVectors.length > 0 && state.showVectors) {
     drawForceVectors(ctx, state.forceVectors, state.camera.zoom);
+  }
+
+  // Draw CoM markers for bodies with useOutlineCOM enabled
+  if (state.showVectors) {
+    const comPositions: { pos: Vec2; color: string; gravityForce: Vec2 | null }[] = [];
+    for (const body of Object.values(state.bodies)) {
+      if (!body.useOutlineCOM) continue;
+      const bodyOutlines = Object.values(state.outlines).filter((o) => o.bodyId === body.id);
+      if (bodyOutlines.length === 0) continue;
+      const transform = computeBodyTransform(body, state.joints);
+      const allWorldPts = bodyOutlines.flatMap((o) => o.points.map((p) => localToWorld(p, transform)));
+      const com = polygonCentroid(allWorldPts);
+      const gravityForce = (state.mode === 'simulate' && state.gravityEnabled)
+        ? { x: 0, y: state.gravityStrength * 0.03 }
+        : null;
+      comPositions.push({ pos: com, color: body.color, gravityForce });
+    }
+    if (comPositions.length > 0) {
+      drawCOMMarkers(ctx, comPositions, state.camera.zoom);
+    }
   }
 
   if (state.simDrag && state.simDrag.active) {

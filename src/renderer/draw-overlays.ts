@@ -118,12 +118,14 @@ export function drawHUD(
     ctx.fillText(coordText, 90, canvasHeight - 10);
   }
 
-  // Version + credit (bottom-left)
-  ctx.font = '10px monospace';
+  // Version + credit (bottom-right, above HUD)
+  ctx.font = '11px monospace';
   ctx.textBaseline = 'bottom';
-  ctx.fillStyle = 'rgba(255,255,255,0.35)';
-  const credit = 'Slinker v0.1.0 — VibeCoded by Hugo Wilson — Claude Opus 4.6';
-  ctx.fillText(credit, 10, canvasHeight - 8);
+  ctx.textAlign = 'right';
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  const credit = 'Slinker v0.2.0 — VibeCoded by Hugo Wilson — Claude Opus 4.6';
+  ctx.fillText(credit, canvasWidth - 10, canvasHeight - 8);
+  ctx.textAlign = 'left';
 }
 
 function drawArrow(
@@ -177,6 +179,44 @@ export function drawForceVectors(
     ctx.arc(v.origin.x, v.origin.y, 3 / zoom, 0, Math.PI * 2);
     ctx.fillStyle = v.color;
     ctx.fill();
+  }
+}
+
+/** Draw CoM markers and gravity vectors for bodies with useOutlineCOM enabled. */
+export function drawCOMMarkers(
+  ctx: CanvasRenderingContext2D,
+  comPositions: { pos: Vec2; color: string; gravityForce: Vec2 | null }[],
+  zoom: number,
+) {
+  for (const { pos, color, gravityForce } of comPositions) {
+    // Diamond marker at COM
+    const s = 6 / zoom;
+    ctx.beginPath();
+    ctx.moveTo(pos.x, pos.y - s);
+    ctx.lineTo(pos.x + s, pos.y);
+    ctx.lineTo(pos.x, pos.y + s);
+    ctx.lineTo(pos.x - s, pos.y);
+    ctx.closePath();
+    ctx.fillStyle = color + '88';
+    ctx.fill();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5 / zoom;
+    ctx.stroke();
+
+    // Label
+    ctx.font = `${9 / zoom}px monospace`;
+    ctx.fillStyle = color;
+    ctx.textBaseline = 'bottom';
+    ctx.textAlign = 'center';
+    ctx.fillText('CoM', pos.x, pos.y - s - 2 / zoom);
+    ctx.textAlign = 'left';
+
+    // Gravity vector from COM
+    if (gravityForce) {
+      const toX = pos.x + gravityForce.x;
+      const toY = pos.y + gravityForce.y;
+      drawArrow(ctx, pos.x, pos.y, toX, toY, color, 2, zoom, false);
+    }
   }
 }
 
