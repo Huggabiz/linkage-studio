@@ -9,8 +9,9 @@ import {
 } from '../../interaction/tool-manager';
 import type { Vec2 } from '../../types';
 
-// Track active touches for pinch-to-zoom
-let activeTouches: Map<number, { x: number; y: number }> = new Map();
+// Multi-pointer tracking for pinch-to-zoom (pointer-only, no touch events)
+const activePointers: Map<number, Vec2> = new Map();
+let isPinching = false;
 let lastPinchDist: number | null = null;
 let lastPinchCenter: Vec2 | null = null;
 
@@ -85,6 +86,31 @@ export function MechanismCanvas() {
     ? (simDrag?.active ? 'grabbing' : 'grab')
     : (hoveredId ? 'pointer' : 'crosshair');
 
+  const handlePinchMove = useCallback(() => {
+    if (activePointers.size < 2) return;
+    const pts = Array.from(activePointers.values());
+    const dx = pts[1].x - pts[0].x;
+    const dy = pts[1].y - pts[0].y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const center: Vec2 = {
+      x: (pts[0].x + pts[1].x) / 2,
+      y: (pts[0].y + pts[1].y) / 2,
+    };
+    const canvas = canvasRef.current!;
+    const rect = canvas.getBoundingClientRect();
+    const screenCenter: Vec2 = { x: center.x - rect.left, y: center.y - rect.top };
+
+    if (lastPinchDist !== null && lastPinchCenter !== null) {
+      const factor = dist / lastPinchDist;
+      useEditorStore.getState().zoomCamera(factor, screenCenter);
+      const panDx = center.x - lastPinchCenter.x;
+      const panDy = center.y - lastPinchCenter.y;
+      useEditorStore.getState().panCamera({ x: panDx, y: panDy });
+    }
+    lastPinchDist = dist;
+    lastPinchCenter = center;
+  }, []);
+
   return (
     <canvas
       ref={canvasRef}
@@ -92,10 +118,38 @@ export function MechanismCanvas() {
       onPointerDown={(e) => {
         const canvas = canvasRef.current!;
         canvas.setPointerCapture(e.pointerId);
-        handleMouseDown(e.nativeEvent as PointerEvent, canvas);
+        activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+        // 2+ pointers = start pinch, cancel any active interaction
+        if (activePointers.size >= 2) {
+          isPinching = true;
+          lastPinchDist = null;
+          lastPinchCenter = null;
+          handleMouseUp(e.nativeEvent as PointerEvent);
+          return;
+        }
+
+        // Single pointer = normal interaction (only if not already pinching)
+        if (!isPinching) {
+          handleMouseDown(e.nativeEvent as PointerEvent, canvas);
+        }
       }}
-      onDoubleClick={(e) => handleDoubleClick(e.nativeEvent, canvasRef.current!)}
+      onDoubleClick={(e) => {
+        if (!isPinching) {
+          handleDoubleClick(e.nativeEvent, canvasRef.current!);
+        }
+      }}
       onPointerMove={(e) => {
+        activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+        // Pinch-to-zoom when 2+ pointers active
+        if (isPinching && activePointers.size >= 2) {
+          handlePinchMove();
+          return;
+        }
+
+        if (isPinching) return;
+
         const canvas = canvasRef.current!;
         const rect = canvas.getBoundingClientRect();
         const screen = { x: e.clientX - rect.left, y: e.clientY - rect.top };
@@ -105,66 +159,36 @@ export function MechanismCanvas() {
       onPointerUp={(e) => {
         const canvas = canvasRef.current!;
         canvas.releasePointerCapture(e.pointerId);
-        handleMouseUp(e.nativeEvent as PointerEvent);
+        activePointers.delete(e.pointerId);
+
+        if (activePointers.size < 2) {
+          isPinching = false;
+          lastPinchDist = null;
+          lastPinchCenter = null;
+        }
+
+        if (!isPinching) {
+          handleMouseUp(e.nativeEvent as PointerEvent);
+        }
       }}
-      onPointerLeave={() => {
-        cursorWorldRef.current = null;
+      onPointerLeave={(e) => {
+        // Only clear cursor for mouse (pen/touch use capture)
+        if (e.pointerType === 'mouse') {
+          cursorWorldRef.current = null;
+        }
       }}
       onPointerCancel={(e) => {
         const canvas = canvasRef.current!;
         canvas.releasePointerCapture(e.pointerId);
-        handleMouseUp(e.nativeEvent as PointerEvent);
-      }}
-      onTouchStart={(e) => {
-        // Track touches for pinch-to-zoom (2+ fingers)
-        for (let i = 0; i < e.changedTouches.length; i++) {
-          const t = e.changedTouches[i];
-          activeTouches.set(t.identifier, { x: t.clientX, y: t.clientY });
-        }
-        if (activeTouches.size >= 2) {
-          lastPinchDist = null;
-          lastPinchCenter = null;
-        }
-      }}
-      onTouchMove={(e) => {
-        for (let i = 0; i < e.changedTouches.length; i++) {
-          const t = e.changedTouches[i];
-          activeTouches.set(t.identifier, { x: t.clientX, y: t.clientY });
-        }
-        if (activeTouches.size >= 2) {
-          const pts = Array.from(activeTouches.values());
-          const dx = pts[1].x - pts[0].x;
-          const dy = pts[1].y - pts[0].y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          const center: Vec2 = {
-            x: (pts[0].x + pts[1].x) / 2,
-            y: (pts[0].y + pts[1].y) / 2,
-          };
-          const canvas = canvasRef.current!;
-          const rect = canvas.getBoundingClientRect();
-          const screenCenter: Vec2 = { x: center.x - rect.left, y: center.y - rect.top };
+        activePointers.delete(e.pointerId);
 
-          if (lastPinchDist !== null && lastPinchCenter !== null) {
-            // Zoom
-            const factor = dist / lastPinchDist;
-            useEditorStore.getState().zoomCamera(factor, screenCenter);
-            // Pan
-            const panDx = center.x - lastPinchCenter.x;
-            const panDy = center.y - lastPinchCenter.y;
-            useEditorStore.getState().panCamera({ x: panDx, y: panDy });
-          }
-          lastPinchDist = dist;
-          lastPinchCenter = center;
-        }
-      }}
-      onTouchEnd={(e) => {
-        for (let i = 0; i < e.changedTouches.length; i++) {
-          activeTouches.delete(e.changedTouches[i].identifier);
-        }
-        if (activeTouches.size < 2) {
+        if (activePointers.size < 2) {
+          isPinching = false;
           lastPinchDist = null;
           lastPinchCenter = null;
         }
+
+        handleMouseUp(e.nativeEvent as PointerEvent);
       }}
       onWheel={(e) => handleWheel(e.nativeEvent, canvasRef.current!)}
       onContextMenu={(e) => e.preventDefault()}
