@@ -441,31 +441,40 @@ export function solveWithForce(
         const tCorrected = (abx * ux + aby * uy) / acLen;
 
         if (tCorrected < 0) {
-          // B is past A — need to push A back (or pull B forward)
-          const overshoot = -tCorrected * acLen; // positive distance B is past A
-          if (freeB && freeA) {
-            // Split correction
-            if (freeB) { predicted[idxB!] += ux * (overshoot / 2); predicted[idxB! + 1] += uy * (overshoot / 2); }
-            if (freeA) { predicted[idxA!] -= ux * (overshoot / 2); predicted[idxA! + 1] -= uy * (overshoot / 2); }
+          // B is before A — slide segment so B is at A's position
+          const overshoot = -tCorrected * acLen;
+          if (freeB && (freeA || freeC)) {
+            // Split: move B forward, move A(&C) backward
+            const bShare = freeB ? 0.5 : 0;
+            const acShift = freeB ? 0.5 : 1;
+            if (freeB) { predicted[idxB!] += ux * overshoot * bShare; predicted[idxB! + 1] += uy * overshoot * bShare; }
+            // Slide entire segment to preserve A-C distance
+            if (freeA) { predicted[idxA!] -= ux * overshoot * acShift; predicted[idxA! + 1] -= uy * overshoot * acShift; }
+            if (freeC) { predicted[idxC!] -= ux * overshoot * acShift; predicted[idxC! + 1] -= uy * overshoot * acShift; }
           } else if (freeB) {
             predicted[idxB!] += ux * overshoot;
             predicted[idxB! + 1] += uy * overshoot;
-          } else if (freeA) {
-            predicted[idxA!] -= ux * overshoot;
-            predicted[idxA! + 1] -= uy * overshoot;
+          } else if (freeA || freeC) {
+            // B is fixed — slide entire AC segment backward
+            if (freeA) { predicted[idxA!] -= ux * overshoot; predicted[idxA! + 1] -= uy * overshoot; }
+            if (freeC) { predicted[idxC!] -= ux * overshoot; predicted[idxC! + 1] -= uy * overshoot; }
           }
         } else if (tCorrected > 1) {
-          // B is past C — need to push C forward (or pull B back)
+          // B is past C — slide segment so B is at C's position
           const overshoot = (tCorrected - 1) * acLen;
-          if (freeB && freeC) {
-            if (freeB) { predicted[idxB!] -= ux * (overshoot / 2); predicted[idxB! + 1] -= uy * (overshoot / 2); }
-            if (freeC) { predicted[idxC!] += ux * (overshoot / 2); predicted[idxC! + 1] += uy * (overshoot / 2); }
+          if (freeB && (freeA || freeC)) {
+            const bShare = freeB ? 0.5 : 0;
+            const acShift = freeB ? 0.5 : 1;
+            if (freeB) { predicted[idxB!] -= ux * overshoot * bShare; predicted[idxB! + 1] -= uy * overshoot * bShare; }
+            if (freeA) { predicted[idxA!] += ux * overshoot * acShift; predicted[idxA! + 1] += uy * overshoot * acShift; }
+            if (freeC) { predicted[idxC!] += ux * overshoot * acShift; predicted[idxC! + 1] += uy * overshoot * acShift; }
           } else if (freeB) {
             predicted[idxB!] -= ux * overshoot;
             predicted[idxB! + 1] -= uy * overshoot;
-          } else if (freeC) {
-            predicted[idxC!] += ux * overshoot;
-            predicted[idxC! + 1] += uy * overshoot;
+          } else if (freeA || freeC) {
+            // B is fixed — slide entire AC segment forward
+            if (freeA) { predicted[idxA!] += ux * overshoot; predicted[idxA! + 1] += uy * overshoot; }
+            if (freeC) { predicted[idxC!] += ux * overshoot; predicted[idxC! + 1] += uy * overshoot; }
           }
         }
       }
