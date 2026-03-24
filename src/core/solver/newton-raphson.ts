@@ -397,29 +397,30 @@ export function solveWithForce(
 
         // --- Sub-constraint 1: Perpendicular correction ---
         if (Math.abs(perpDist) > 1e-10) {
-          const wB = freeB ? 1 : 0;
-          const wAC = (freeA ? 1 : 0) + (freeC ? 1 : 0);
-          const totalW = wB + wAC;
-          if (totalW > 0) {
-            // B moves toward line, A&C move away from B (perpendicular)
-            const bShare = totalW > 0 ? (wAC > 0 ? wAC / totalW : 1) : 0;
-            const acShare = wAC > 0 && wB > 0 ? (wB / totalW) / wAC : 0;
+          const hasBSide = freeB;
+          const hasACSide = freeA || freeC;
+          if (hasBSide || hasACSide) {
+            // Split correction between B side and AC side (50/50 if both free)
+            const bFrac = hasBSide ? (hasACSide ? 0.5 : 1.0) : 0;
+            const acFrac = hasACSide ? (hasBSide ? 0.5 : 1.0) : 0;
 
+            // B moves toward line (in -perp direction)
             if (freeB) {
-              bx -= perpX * perpDist * bShare;
-              by -= perpY * perpDist * bShare;
+              bx -= perpX * perpDist * bFrac;
+              by -= perpY * perpDist * bFrac;
               predicted[idxB!] = bx;
               predicted[idxB! + 1] = by;
             }
+            // A&C move to push line toward B (in +perp direction)
             if (freeA) {
-              ax += perpX * perpDist * acShare;
-              ay += perpY * perpDist * acShare;
+              ax += perpX * perpDist * acFrac;
+              ay += perpY * perpDist * acFrac;
               predicted[idxA!] = ax;
               predicted[idxA! + 1] = ay;
             }
             if (freeC) {
-              cx2 += perpX * perpDist * acShare;
-              cy2 += perpY * perpDist * acShare;
+              cx2 += perpX * perpDist * acFrac;
+              cy2 += perpY * perpDist * acFrac;
               predicted[idxC!] = cx2;
               predicted[idxC! + 1] = cy2;
             }
