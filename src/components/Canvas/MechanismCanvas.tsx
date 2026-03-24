@@ -9,15 +9,16 @@ import {
 } from '../../interaction/tool-manager';
 import type { Vec2 } from '../../types';
 
-// Multi-pointer tracking for pinch-to-zoom (pointer-only, no touch events)
+// --- Touch gesture state (module-level, survives re-renders) ---
 const activePointers: Map<number, Vec2> = new Map();
-let isPinching = false;
-let wasPinching = false; // cooldown: true until all pointers lift after a pinch
+let gestureState: 'none' | 'pending' | 'pan' | 'pinch' = 'none';
 let lastPinchDist: number | null = null;
 let lastPinchCenter: Vec2 | null = null;
-let pendingDownEvent: { pointerId: number; event: PointerEvent; canvas: HTMLCanvasElement } | null = null;
-let pendingDownTimer: ReturnType<typeof setTimeout> | null = null;
-const PINCH_DETECT_DELAY = 80; // ms to wait for second finger before treating as single-tap
+let touchStartPos: Vec2 | null = null; // where the first finger landed
+let touchStartPointerId: number | null = null;
+let lastTouchScreen: Vec2 | null = null; // last position for single-finger pan
+
+const PAN_THRESHOLD = 8; // px movement before a touch becomes a pan drag
 
 
 export function MechanismCanvas() {
@@ -146,123 +147,139 @@ export function MechanismCanvas() {
     lastPinchCenter = center;
   }, []);
 
+  // Reset all touch gesture state
+  const resetGesture = useCallback(() => {
+    gestureState = 'none';
+    lastPinchDist = null;
+    lastPinchCenter = null;
+    touchStartPos = null;
+    touchStartPointerId = null;
+    lastTouchScreen = null;
+  }, []);
+
   return (
     <canvas
       ref={canvasRef}
       style={{ width: '100%', height: '100%', cursor, userSelect: 'none', touchAction: 'none' }}
       onPointerDown={(e) => {
-        // Prevent default for touch/pen to stop browser gestures
-        if (e.pointerType !== 'mouse') e.preventDefault();
-
         const canvas = canvasRef.current!;
-        canvas.setPointerCapture(e.pointerId);
-        activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
-        // 2+ pointers = start pinch, cancel any pending single-tap and active interaction
-        if (activePointers.size >= 2) {
-          isPinching = true;
-          wasPinching = true;
-          lastPinchDist = null;
-          lastPinchCenter = null;
-          // Cancel any deferred single-pointer down
-          if (pendingDownTimer) { clearTimeout(pendingDownTimer); pendingDownTimer = null; pendingDownEvent = null; }
-          handleMouseUp(e.nativeEvent as PointerEvent);
-          return;
-        }
-
-        // For mouse, fire immediately (no multi-touch possible)
+        // --- MOUSE: pass through directly (no gesture detection needed) ---
         if (e.pointerType === 'mouse') {
           handleMouseDown(e.nativeEvent as PointerEvent, canvas);
           return;
         }
 
-        // For touch/pen: defer to allow second finger for pinch detection
-        // Don't start interaction if we're still cooling down from a pinch
-        if (isPinching || wasPinching) return;
+        // --- TOUCH / PEN ---
+        e.preventDefault();
+        canvas.setPointerCapture(e.pointerId);
+        activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
-        // In simulate mode, fire immediately for responsive dragging
-        const currentMode = useEditorStore.getState().mode;
-        if (currentMode === 'simulate') {
-          handleMouseDown(e.nativeEvent as PointerEvent, canvas);
+        if (activePointers.size >= 2) {
+          // Transition to pinch: cancel any in-progress single-pointer interaction
+          if (gestureState === 'pan' || gestureState === 'pending') {
+            handleMouseUp(e.nativeEvent as PointerEvent);
+          }
+          gestureState = 'pinch';
+          lastPinchDist = null;
+          lastPinchCenter = null;
           return;
         }
 
-        // In create mode, defer to distinguish tap from pinch
-        pendingDownEvent = { pointerId: e.pointerId, event: e.nativeEvent as PointerEvent, canvas };
-        pendingDownTimer = setTimeout(() => {
-          if (pendingDownEvent && !isPinching && !wasPinching) {
-            handleMouseDown(pendingDownEvent.event, pendingDownEvent.canvas);
-          }
-          pendingDownEvent = null;
-          pendingDownTimer = null;
-        }, PINCH_DETECT_DELAY);
+        // First finger down: record start, wait to see if it's a tap, pan, or pinch
+        gestureState = 'pending';
+        touchStartPos = { x: e.clientX, y: e.clientY };
+        touchStartPointerId = e.pointerId;
+        lastTouchScreen = { x: e.clientX, y: e.clientY };
       }}
       onDoubleClick={(e) => {
-        if (!isPinching) {
+        if (gestureState !== 'pinch') {
           handleDoubleClick(e.nativeEvent, canvasRef.current!);
         }
       }}
       onPointerMove={(e) => {
-        if (e.pointerType !== 'mouse') e.preventDefault();
-        activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        const canvas = canvasRef.current!;
 
-        // Pinch-to-zoom when 2+ pointers active
-        if (isPinching && activePointers.size >= 2) {
-          handlePinchMove();
+        // --- MOUSE: pass through directly ---
+        if (e.pointerType === 'mouse') {
+          const rect = canvas.getBoundingClientRect();
+          const screen = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+          cursorWorldRef.current = screenToWorld(screen, useEditorStore.getState().camera);
+          handleMouseMove(e.nativeEvent as PointerEvent, canvas);
           return;
         }
 
-        if (isPinching || wasPinching) return;
+        // --- TOUCH / PEN ---
+        e.preventDefault();
+        activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
-        // If we have a pending deferred down and finger moved enough, fire it now
-        if (pendingDownEvent && pendingDownEvent.pointerId === e.pointerId) {
-          const dx = e.clientX - pendingDownEvent.event.clientX;
-          const dy = e.clientY - pendingDownEvent.event.clientY;
-          if (dx * dx + dy * dy > 9) { // 3px movement threshold
-            clearTimeout(pendingDownTimer!);
-            handleMouseDown(pendingDownEvent.event, pendingDownEvent.canvas);
-            pendingDownEvent = null;
-            pendingDownTimer = null;
+        // Pinch mode: zoom + pan with two fingers
+        if (gestureState === 'pinch') {
+          if (activePointers.size >= 2) {
+            handlePinchMove();
           }
+          return;
         }
 
-        const canvas = canvasRef.current!;
-        const rect = canvas.getBoundingClientRect();
-        const screen = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-        cursorWorldRef.current = screenToWorld(screen, useEditorStore.getState().camera);
-        handleMouseMove(e.nativeEvent as PointerEvent, canvas);
+        // Pending: check if finger moved enough to become a pan
+        if (gestureState === 'pending' && touchStartPos) {
+          const dx = e.clientX - touchStartPos.x;
+          const dy = e.clientY - touchStartPos.y;
+          if (dx * dx + dy * dy > PAN_THRESHOLD * PAN_THRESHOLD) {
+            gestureState = 'pan';
+            lastTouchScreen = { x: e.clientX, y: e.clientY };
+          }
+          return; // Don't do anything else while pending
+        }
+
+        // Single-finger pan
+        if (gestureState === 'pan' && lastTouchScreen) {
+          const dx = e.clientX - lastTouchScreen.x;
+          const dy = e.clientY - lastTouchScreen.y;
+          useEditorStore.getState().panCamera({ x: dx, y: dy });
+          lastTouchScreen = { x: e.clientX, y: e.clientY };
+          return;
+        }
       }}
       onPointerUp={(e) => {
         const canvas = canvasRef.current!;
-        canvas.releasePointerCapture(e.pointerId);
-        activePointers.delete(e.pointerId);
 
-        // Cancel deferred down if this pointer is lifting before it fired
-        if (pendingDownEvent && pendingDownEvent.pointerId === e.pointerId) {
-          clearTimeout(pendingDownTimer!);
-          // Fire as a tap if it wasn't a pinch
-          if (!isPinching && !wasPinching) {
-            handleMouseDown(pendingDownEvent.event, pendingDownEvent.canvas);
-            handleMouseUp(e.nativeEvent as PointerEvent);
-          }
-          pendingDownEvent = null;
-          pendingDownTimer = null;
+        // --- MOUSE: pass through directly ---
+        if (e.pointerType === 'mouse') {
+          handleMouseUp(e.nativeEvent as PointerEvent);
           return;
         }
 
-        if (activePointers.size < 2) {
-          isPinching = false;
-          lastPinchDist = null;
-          lastPinchCenter = null;
+        // --- TOUCH / PEN ---
+        try { canvas.releasePointerCapture(e.pointerId); } catch (_) { /* already released */ }
+        activePointers.delete(e.pointerId);
+
+        if (gestureState === 'pinch') {
+          // Still have 2+ fingers? Stay in pinch. Otherwise wait for all fingers to lift.
+          if (activePointers.size >= 2) {
+            // Reset pinch baseline for remaining fingers
+            lastPinchDist = null;
+            lastPinchCenter = null;
+          } else if (activePointers.size === 0) {
+            resetGesture();
+          }
+          // Don't fire any interaction when coming out of pinch
+          return;
         }
 
-        // Clear pinch cooldown only when ALL pointers are gone
-        if (activePointers.size === 0) {
-          wasPinching = false;
-        }
-
-        if (!isPinching && !wasPinching) {
+        if (gestureState === 'pending' && touchStartPos && e.pointerId === touchStartPointerId) {
+          // Finger lifted without significant movement → TAP
+          // Fire down + up at the touch position to trigger the action (place joint, select, etc.)
+          handleMouseDown(e.nativeEvent as PointerEvent, canvas);
           handleMouseUp(e.nativeEvent as PointerEvent);
+          resetGesture();
+          activePointers.clear();
+          return;
+        }
+
+        // End of pan or other gesture
+        if (activePointers.size === 0) {
+          resetGesture();
         }
       }}
       onPointerLeave={(e) => {
@@ -273,23 +290,15 @@ export function MechanismCanvas() {
       }}
       onPointerCancel={(e) => {
         const canvas = canvasRef.current!;
-        canvas.releasePointerCapture(e.pointerId);
+        try { canvas.releasePointerCapture(e.pointerId); } catch (_) { /* already released */ }
         activePointers.delete(e.pointerId);
 
-        // Cancel any deferred down
-        if (pendingDownTimer) { clearTimeout(pendingDownTimer); pendingDownTimer = null; pendingDownEvent = null; }
-
-        if (activePointers.size < 2) {
-          isPinching = false;
-          lastPinchDist = null;
-          lastPinchCenter = null;
-        }
         if (activePointers.size === 0) {
-          wasPinching = false;
-        }
-
-        if (!isPinching && !wasPinching) {
-          handleMouseUp(e.nativeEvent as PointerEvent);
+          if (gestureState !== 'none') {
+            handleMouseUp(e.nativeEvent as PointerEvent);
+          }
+          resetGesture();
+          activePointers.clear();
         }
       }}
       onWheel={(e) => handleWheel(e.nativeEvent, canvasRef.current!)}
