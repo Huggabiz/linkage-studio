@@ -3,6 +3,7 @@ import { useMechanismStore } from '../../store/mechanism-store';
 import type { AppMode } from '../../types';
 import type { Vec2 } from '../../types';
 import { screenToWorld } from '../../renderer/camera';
+import { computeBodyTransform, localToWorld } from '../../core/body-transform';
 import './Toolbar.css';
 
 export function Toolbar() {
@@ -75,6 +76,21 @@ export function Toolbar() {
     }
 
     setMode(newMode);
+
+    // After switching back to create mode, setMode resets lockOutlines=true
+    // with empty frozenOutlineWorldPoints. Capture fresh frozen points so
+    // the lock is actually effective.
+    if (newMode === 'create') {
+      const mech = useMechanismStore.getState();
+      const frozen = new Map<string, Vec2[]>();
+      for (const outline of Object.values(mech.outlines)) {
+        const body = mech.bodies[outline.bodyId];
+        if (!body || outline.points.length < 2) continue;
+        const transform = computeBodyTransform(body, mech.joints);
+        frozen.set(outline.id, outline.points.map((p) => localToWorld(p, transform)));
+      }
+      useEditorStore.getState().setLockOutlines(true, frozen);
+    }
   };
 
   const handleImportImage = () => {
