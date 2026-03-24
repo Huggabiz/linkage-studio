@@ -1,4 +1,4 @@
-import type { Body, Joint, Link } from '../types';
+import type { Body, Joint, Link, SliderConstraint } from '../types';
 import { distance } from './math/vec2';
 
 /**
@@ -13,10 +13,13 @@ import { distance } from './math/vec2';
  *
  * Links are deduplicated across bodies (same joint pair → one link).
  * IDs are deterministic: `link_{min(idA,idB)}_{max(idA,idB)}`.
+ *
+ * Also generates A-C distance constraints for slider joints.
  */
 export function generateBodyLinks(
   bodies: Record<string, Body>,
   joints: Record<string, Joint>,
+  sliders?: Record<string, SliderConstraint>,
 ): Link[] {
   const linkMap = new Map<string, Link>();
 
@@ -53,6 +56,13 @@ export function generateBodyLinks(
     }
     for (let i = 1; i < n - 1; i++) {
       addPair(ids[i], ids[i + 1]);
+    }
+  }
+
+  // Add A-C distance constraints from slider joints
+  if (sliders) {
+    for (const slider of Object.values(sliders)) {
+      addPair(slider.jointIdA, slider.jointIdC);
     }
   }
 

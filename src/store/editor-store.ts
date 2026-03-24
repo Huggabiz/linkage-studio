@@ -25,6 +25,7 @@ interface EditorStore {
   lockOutlines: boolean;
   frozenOutlineWorldPoints: Map<string, Vec2[]>;
   imageDragMode: 'move' | 'rotate' | 'scale' | null;
+  sliderPointA: { position: Vec2; jointId: string } | null;  // first placed joint of slider
 
   setMode(mode: AppMode): void;
   setTool(tool: ToolType): void;
@@ -50,6 +51,7 @@ interface EditorStore {
   clearOutlinePoints(): void;
   setLockOutlines(locked: boolean, frozenPoints?: Map<string, Vec2[]>): void;
   setImageDragMode(mode: 'move' | 'rotate' | 'scale' | null): void;
+  setSliderPointA(point: { position: Vec2; jointId: string } | null): void;
 }
 
 export const useEditorStore = create<EditorStore>((set) => ({
@@ -74,9 +76,10 @@ export const useEditorStore = create<EditorStore>((set) => ({
   lockOutlines: false,
   frozenOutlineWorldPoints: new Map(),
   imageDragMode: null,
+  sliderPointA: null,
 
   setMode(mode) {
-    set({ mode, simDrag: null, linkStartJointId: null, selectedIds: new Set(), outlinePoints: [], createTool: 'joints' as CreateTool, jointMode: 'manual' as JointMode, autoChainLastBodyId: null, lockOutlines: false, frozenOutlineWorldPoints: new Map() });
+    set({ mode, simDrag: null, linkStartJointId: null, selectedIds: new Set(), outlinePoints: [], createTool: 'joints' as CreateTool, jointMode: 'manual' as JointMode, autoChainLastBodyId: null, lockOutlines: false, frozenOutlineWorldPoints: new Map(), sliderPointA: null });
   },
 
   setTool(tool) {
@@ -171,7 +174,7 @@ export const useEditorStore = create<EditorStore>((set) => ({
   },
 
   setCreateTool(tool) {
-    set({ createTool: tool, outlinePoints: [], jointMode: 'manual' as JointMode, autoChainLastBodyId: null });
+    set({ createTool: tool, outlinePoints: [], jointMode: 'manual' as JointMode, autoChainLastBodyId: null, sliderPointA: null });
   },
 
   setJointMode(mode) {
@@ -200,5 +203,9 @@ export const useEditorStore = create<EditorStore>((set) => ({
 
   setImageDragMode(mode) {
     set({ imageDragMode: mode });
+  },
+
+  setSliderPointA(point) {
+    set({ sliderPointA: point });
   },
 }));

@@ -89,7 +89,6 @@ export function Toolbar() {
         const dataUrl = reader.result as string;
         const img = new Image();
         img.onload = () => {
-          // Place image at current camera center
           const camera = useEditorStore.getState().camera;
           const canvas = document.querySelector('canvas');
           let center: Vec2 = { x: 0, y: 0 };
@@ -106,6 +105,59 @@ export function Toolbar() {
       reader.readAsDataURL(file);
     };
     input.click();
+  };
+
+  const isPivotTool = createTool === 'joints';
+  const isSliderTool = createTool === 'slider';
+  const isJointsTool = isPivotTool || isSliderTool;
+
+  const renderHints = () => {
+    if (isPivotTool && jointMode === 'manual') {
+      return (
+        <>
+          <div className="sim-hint">Click to add pivot joint</div>
+          <div className="sim-hint">Click joint to select</div>
+          <div className="sim-hint">Double-click to toggle fixed</div>
+        </>
+      );
+    }
+    if (isPivotTool && jointMode === 'autochain') {
+      return (
+        <>
+          <div className="sim-hint">Click to place chain joints</div>
+          <div className="sim-hint">Click existing joint to end chain</div>
+          <div className="sim-hint">Escape to stop</div>
+        </>
+      );
+    }
+    if (isSliderTool) {
+      return (
+        <>
+          <div className="sim-hint">Click to place end A</div>
+          <div className="sim-hint">Click again to place end C</div>
+          <div className="sim-hint">Slider B auto-placed at midpoint</div>
+          <div className="sim-hint">Escape to cancel</div>
+        </>
+      );
+    }
+    if (createTool === 'outline') {
+      return (
+        <>
+          <div className="sim-hint">Click to place outline points</div>
+          <div className="sim-hint">Click first point to close</div>
+          <div className="sim-hint">Escape to cancel</div>
+        </>
+      );
+    }
+    // image
+    return (
+      <>
+        <div className="sim-hint">Click image to select</div>
+        <div className="sim-hint">Drag to move</div>
+        <div className="sim-hint">Drag corners to scale</div>
+        <div className="sim-hint">Drag top handle to rotate</div>
+      </>
+    );
   };
 
   return (
@@ -129,14 +181,20 @@ export function Toolbar() {
         <>
           <div className="toolbar-section">
             <div className="toolbar-label">Tools</div>
+
+            {/* Joints group header */}
+            <div className="toolbar-label" style={{ fontSize: 9, padding: '6px 8px 1px', color: '#666' }}>Joints</div>
+
+            {/* Pivot */}
             <button
-              className={`tool-btn ${createTool === 'joints' ? 'active' : ''}`}
+              className={`tool-btn sub ${isPivotTool ? 'active' : ''}`}
               onClick={() => setCreateTool('joints')}
+              style={{ paddingLeft: 16 }}
             >
-              Joints
+              Pivot
             </button>
-            {createTool === 'joints' && (
-              <div className="sub-tools">
+            {isPivotTool && (
+              <div className="sub-tools" style={{ paddingLeft: 24 }}>
                 <button
                   className={`tool-btn sub ${jointMode === 'manual' ? 'active' : ''}`}
                   onClick={() => setJointMode('manual')}
@@ -151,21 +209,32 @@ export function Toolbar() {
                 </button>
               </div>
             )}
+
+            {/* Slider */}
+            <button
+              className={`tool-btn sub ${isSliderTool ? 'active' : ''}`}
+              onClick={() => setCreateTool('slider')}
+              style={{ paddingLeft: 16 }}
+            >
+              Slider
+            </button>
+
+            {/* Outline */}
             <button
               className={`tool-btn ${createTool === 'outline' ? 'active' : ''}`}
               onClick={() => setCreateTool('outline')}
             >
               Outline
             </button>
+
+            {/* Image */}
             <button
               className={`tool-btn ${createTool === 'image' ? 'active' : ''}`}
               onClick={() => {
                 if (createTool === 'image') {
-                  // Already in image mode - open file picker to add another
                   handleImportImage();
                 } else {
                   setCreateTool('image');
-                  // If no images exist yet, auto-open the file picker
                   const hasImages = Object.keys(useMechanismStore.getState().images).length > 0;
                   if (!hasImages) handleImportImage();
                 }
@@ -189,32 +258,7 @@ export function Toolbar() {
           )}
 
           <div className="toolbar-section">
-            {createTool === 'joints' && jointMode === 'manual' ? (
-              <>
-                <div className="sim-hint">Click to add joint</div>
-                <div className="sim-hint">Click joint to select</div>
-                <div className="sim-hint">Double-click to toggle fixed</div>
-              </>
-            ) : createTool === 'joints' && jointMode === 'autochain' ? (
-              <>
-                <div className="sim-hint">Click to place chain joints</div>
-                <div className="sim-hint">Click existing joint to end chain</div>
-                <div className="sim-hint">Escape to stop</div>
-              </>
-            ) : createTool === 'outline' ? (
-              <>
-                <div className="sim-hint">Click to place outline points</div>
-                <div className="sim-hint">Click first point to close</div>
-                <div className="sim-hint">Escape to cancel</div>
-              </>
-            ) : (
-              <>
-                <div className="sim-hint">Click image to select</div>
-                <div className="sim-hint">Drag to move</div>
-                <div className="sim-hint">Drag corners to scale</div>
-                <div className="sim-hint">Drag top handle to rotate</div>
-              </>
-            )}
+            {renderHints()}
           </div>
         </>
       ) : (

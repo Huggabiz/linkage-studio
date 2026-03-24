@@ -1,4 +1,4 @@
-import type { Joint, Link, Vec2, SolverResult, ForceVector } from '../../types';
+import type { Joint, Link, SliderConstraint, Vec2, SolverResult, ForceVector } from '../../types';
 import { distanceConstraint, angleDriverConstraint } from './constraints';
 import { createMatrix, solveLU } from '../math/linalg';
 import { SOLVER_MAX_ITERATIONS, SOLVER_TOLERANCE, SOLVER_DAMPING } from '../../utils/constants';
@@ -173,6 +173,7 @@ export function solveWithForce(
   dt: number,
   fixedJointIds?: Set<string>,
   jointGravityWeights?: Map<string, number>,
+  sliders?: Record<string, SliderConstraint>,
 ): SolverResult {
   const freeJoints: Joint[] = [];
   const jointIndex = new Map<string, number>();
@@ -316,7 +317,8 @@ export function solveWithForce(
       predicted[i] = q[i] + v[i] * subDt;
     }
 
-    // 3. Project distance constraints
+    // 3. Project distance constraints + slider constraints
+    const sliderArray = sliders ? Object.values(sliders) : [];
     for (let pass = 0; pass < CONSTRAINT_PASSES; pass++) {
       for (const link of linkArray) {
         const idxI = jointIndex.get(link.jointIds[0]);
@@ -345,6 +347,42 @@ export function solveWithForce(
         const cy = ddy * diff / w;
         if (isFreeI) { predicted[idxI!] += cx; predicted[idxI! + 1] += cy; }
         if (isFreeJ) { predicted[idxJ!] -= cx; predicted[idxJ! + 1] -= cy; }
+      }
+
+      // Slider constraints: project B onto line AC, enforce A-C distance
+      for (const slider of sliderArray) {
+        const idxA = jointIndex.get(slider.jointIdA);
+        const idxB = jointIndex.get(slider.jointIdB);
+        const idxC = jointIndex.get(slider.jointIdC);
+        const jA = joints[slider.jointIdA];
+        const jB = joints[slider.jointIdB];
+        const jC = joints[slider.jointIdC];
+        if (!jA || !jB || !jC) continue;
+
+        // Current predicted positions
+        const ax = idxA !== undefined ? predicted[idxA] : jA.position.x;
+        const ay = idxA !== undefined ? predicted[idxA + 1] : jA.position.y;
+        let bx = idxB !== undefined ? predicted[idxB] : jB.position.x;
+        let by = idxB !== undefined ? predicted[idxB + 1] : jB.position.y;
+        const cx2 = idxC !== undefined ? predicted[idxC] : jC.position.x;
+        const cy2 = idxC !== undefined ? predicted[idxC + 1] : jC.position.y;
+
+        // Project B onto line segment AC
+        const acx = cx2 - ax;
+        const acy = cy2 - ay;
+        const acLenSq = acx * acx + acy * acy;
+        if (acLenSq < 1e-8) continue;
+
+        const abx = bx - ax;
+        const aby = by - ay;
+        const t = Math.max(0, Math.min(1, (abx * acx + aby * acy) / acLenSq));
+        const projBx = ax + acx * t;
+        const projBy = ay + acy * t;
+
+        if (idxB !== undefined) {
+          predicted[idxB] = projBx;
+          predicted[idxB + 1] = projBy;
+        }
       }
     }
 
