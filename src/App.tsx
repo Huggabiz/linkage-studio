@@ -100,6 +100,7 @@ function App() {
           fixedJointIds,
           jointGravityWeights,
           mech.sliders,
+          mech.angleConstraints,
         );
 
         sim.setSolverResult(result);

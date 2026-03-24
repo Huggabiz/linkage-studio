@@ -58,6 +58,19 @@ export interface SliderConstraint {
   t: number;
 }
 
+/**
+ * Angle constraint: maintains the angle at joint B (vertex) between joints A and C.
+ * Used to stiffen collinear or near-collinear joint triplets where distance
+ * constraints alone become degenerate and converge slowly in PBD.
+ */
+export interface AngleConstraint {
+  readonly id: string;
+  jointIdA: string;
+  jointIdB: string;  // vertex joint (the angle is measured here)
+  jointIdC: string;
+  restAngle: number; // radians — the angle ABC at design time
+}
+
 export interface MechanismState {
   joints: Record<string, Joint>;
   links: Record<string, Link>;
