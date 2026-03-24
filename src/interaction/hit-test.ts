@@ -4,6 +4,31 @@ import { distToSegment } from '../core/math/vec2';
 import { HIT_RADIUS, LINK_HIT_THRESHOLD } from '../utils/constants';
 import { computeBodyTransform, localToWorld } from '../core/body-transform';
 
+/**
+ * Lightweight boolean hit-test — checks if worldPos is near any joint or link.
+ * Does NOT mutate click-cycling state (lastHitJointId). Use this for
+ * touch gesture classification (interact vs pan) where we just need a yes/no.
+ */
+export function hitTestAny(
+  worldPos: Vec2,
+  joints: Record<string, Joint>,
+  links: Record<string, Link>,
+  zoom: number,
+): boolean {
+  const jointThreshold = HIT_RADIUS / zoom;
+  for (const joint of Object.values(joints)) {
+    if (distance(worldPos, joint.position) < jointThreshold) return true;
+  }
+  const linkThreshold = LINK_HIT_THRESHOLD / zoom;
+  for (const link of Object.values(links)) {
+    const jA = joints[link.jointIds[0]];
+    const jB = joints[link.jointIds[1]];
+    if (!jA || !jB) continue;
+    if (distToSegment(worldPos, jA.position, jB.position) < linkThreshold) return true;
+  }
+  return false;
+}
+
 // Track last hit joint for click-cycling through overlapping joints
 let lastHitJointId: string | null = null;
 
