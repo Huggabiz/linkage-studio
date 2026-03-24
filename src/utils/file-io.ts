@@ -18,7 +18,7 @@ export function serializeMechanism(
   outlines: Record<string, Outline>,
 ): string {
   const data: SlinkerFile = {
-    version: '0.3.0',
+    version: '0.4.0',
     joints: {},
     links: {},
     bodies: {},
@@ -108,6 +108,34 @@ export function downloadFile(content: string, filename: string) {
   a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+/** Save with native file picker if available, otherwise download with prompt for name. */
+export async function saveFileAs(content: string, suggestedName: string): Promise<void> {
+  // Try File System Access API (Chrome/Edge desktop)
+  if ('showSaveFilePicker' in window) {
+    try {
+      const handle = await (window as any).showSaveFilePicker({
+        suggestedName,
+        types: [{
+          description: 'Slinker files',
+          accept: { 'application/json': ['.slinker'] },
+        }],
+      });
+      const writable = await handle.createWritable();
+      await writable.write(content);
+      await writable.close();
+      return;
+    } catch (e: any) {
+      if (e?.name === 'AbortError') return; // user cancelled
+      // Fall through to prompt + download
+    }
+  }
+  // Fallback: prompt for name then download
+  const name = prompt('Save as:', suggestedName);
+  if (!name) return;
+  const finalName = name.endsWith('.slinker') ? name : name + '.slinker';
+  downloadFile(content, finalName);
 }
 
 export function openFilePicker(): Promise<string | null> {

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Joint, Link, Body, Outline, CanvasImage, JointType } from '../types';
+import type { Joint, Link, Body, Outline, CanvasImage, SliderConstraint, JointType } from '../types';
 import type { Vec2 } from '../types';
 import { createId } from '../utils/id';
 import { generateBodyLinks } from '../core/body-links';
@@ -13,6 +13,7 @@ interface HistorySnapshot {
   baseBodyId: string;
   outlines: Record<string, Outline>;
   images: Record<string, CanvasImage>;
+  sliders: Record<string, SliderConstraint>;
 }
 
 const BASE_BODY_ID = 'base';
@@ -28,6 +29,7 @@ interface MechanismStore {
   baseBodyId: string;
   outlines: Record<string, Outline>;
   images: Record<string, CanvasImage>;
+  sliders: Record<string, SliderConstraint>;
 
   past: HistorySnapshot[];
   future: HistorySnapshot[];
@@ -56,12 +58,17 @@ interface MechanismStore {
   removeImage(id: string): void;
   updateImage(id: string, updates: Partial<Pick<CanvasImage, 'position' | 'scale' | 'rotation' | 'opacity' | 'visible'>>): void;
 
+  addSlider(jointIdA: string, jointIdC: string, jointIdB: string): string;
+  removeSlider(id: string): void;
+  updateSliderT(id: string, t: number): void;
+  getSliderForJoint(jointId: string): SliderConstraint | undefined;
+
   addTempJoint(position: Vec2, bodyId: string): string;
   removeTempJoint(id: string): void;
   reprojectOutlinesFromWorld(frozenWorldPoints: Map<string, Vec2[]>): void;
 
   clearAll(): void;
-  loadState(state: { joints: Record<string, Joint>; links: Record<string, Link>; bodies: Record<string, Body>; baseBodyId: string; outlines: Record<string, Outline>; images?: Record<string, CanvasImage> }): void;
+  loadState(state: { joints: Record<string, Joint>; links: Record<string, Link>; bodies: Record<string, Body>; baseBodyId: string; outlines: Record<string, Outline>; images?: Record<string, CanvasImage>; sliders?: Record<string, SliderConstraint> }): void;
   pushHistory(): void;
   undo(): void;
   redo(): void;
@@ -74,6 +81,7 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
   baseBodyId: BASE_BODY_ID,
   outlines: {},
   images: {},
+  sliders: {},
   past: [],
   future: [],
 
@@ -106,6 +114,36 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
     });
   },
 
+  addSlider(jointIdA, jointIdC, jointIdB) {
+    const id = createId();
+    const slider: SliderConstraint = { id, jointIdA, jointIdB, jointIdC, t: 0.5 };
+    set((s) => ({ sliders: { ...s.sliders, [id]: slider } }));
+    return id;
+  },
+
+  removeSlider(id) {
+    set((s) => {
+      const newSliders = { ...s.sliders };
+      delete newSliders[id];
+      return { sliders: newSliders };
+    });
+  },
+
+  updateSliderT(id, t) {
+    set((s) => {
+      const slider = s.sliders[id];
+      if (!slider) return s;
+      return { sliders: { ...s.sliders, [id]: { ...slider, t: Math.max(0, Math.min(1, t)) } } };
+    });
+  },
+
+  getSliderForJoint(jointId) {
+    const { sliders } = get();
+    return Object.values(sliders).find(
+      (s) => s.jointIdA === jointId || s.jointIdB === jointId || s.jointIdC === jointId,
+    );
+  },
+
   addTempJoint(position, bodyId) {
     const id = '__temp_' + createId();
     const joint: Joint = { id, type: 'revolute', position, connectedLinkIds: [] };
@@ -116,7 +154,7 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
       newBodies[bodyId] = { ...body, jointIds: [...body.jointIds, id] };
     }
     // Regenerate links so the temp joint is constrained to the body
-    const newLinks = buildLinksRecord(generateBodyLinks(newBodies, newJoints));
+    const newLinks = buildLinksRecord(generateBodyLinks(newBodies, newJoints, get().sliders));
     updateJointConnections(newJoints, newLinks);
     set({ joints: newJoints, links: newLinks, bodies: newBodies });
     return id;
@@ -133,7 +171,7 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
       }
     }
     delete newJoints[id];
-    const newLinks = buildLinksRecord(generateBodyLinks(newBodies, newJoints));
+    const newLinks = buildLinksRecord(generateBodyLinks(newBodies, newJoints, get().sliders));
     updateJointConnections(newJoints, newLinks);
     set({ joints: newJoints, links: newLinks, bodies: newBodies });
   },
@@ -162,6 +200,7 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
       baseBodyId: BASE_BODY_ID,
       outlines: {},
       images: {},
+      sliders: {},
       past: [],
       future: [],
     });
@@ -175,21 +214,22 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
       baseBodyId: state.baseBodyId,
       outlines: state.outlines,
       images: state.images || {},
+      sliders: state.sliders || {},
       past: [],
       future: [],
     });
   },
 
   pushHistory() {
-    const { joints, links, bodies, baseBodyId, outlines, images, past } = get();
+    const { joints, links, bodies, baseBodyId, outlines, images, sliders, past } = get();
     set({
-      past: [...past.slice(-50), { joints: { ...joints }, links: { ...links }, bodies: { ...bodies }, baseBodyId, outlines: { ...outlines }, images: { ...images } }],
+      past: [...past.slice(-50), { joints: { ...joints }, links: { ...links }, bodies: { ...bodies }, baseBodyId, outlines: { ...outlines }, images: { ...images }, sliders: { ...sliders } }],
       future: [],
     });
   },
 
   undo() {
-    const { past, joints, links, bodies, baseBodyId, outlines, images } = get();
+    const { past, joints, links, bodies, baseBodyId, outlines, images, sliders } = get();
     if (past.length === 0) return;
     const prev = past[past.length - 1];
     set({
@@ -199,13 +239,14 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
       baseBodyId: prev.baseBodyId,
       outlines: prev.outlines,
       images: prev.images || {},
+      sliders: prev.sliders || {},
       past: past.slice(0, -1),
-      future: [{ joints: { ...joints }, links: { ...links }, bodies: { ...bodies }, baseBodyId, outlines: { ...outlines }, images: { ...images } }, ...get().future],
+      future: [{ joints: { ...joints }, links: { ...links }, bodies: { ...bodies }, baseBodyId, outlines: { ...outlines }, images: { ...images }, sliders: { ...sliders } }, ...get().future],
     });
   },
 
   redo() {
-    const { future, joints, links, bodies, baseBodyId, outlines, images } = get();
+    const { future, joints, links, bodies, baseBodyId, outlines, images, sliders } = get();
     if (future.length === 0) return;
     const next = future[0];
     set({
@@ -215,8 +256,9 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
       baseBodyId: next.baseBodyId,
       outlines: next.outlines,
       images: next.images || {},
+      sliders: next.sliders || {},
       future: future.slice(1),
-      past: [...get().past, { joints: { ...joints }, links: { ...links }, bodies: { ...bodies }, baseBodyId, outlines: { ...outlines }, images: { ...images } }],
+      past: [...get().past, { joints: { ...joints }, links: { ...links }, bodies: { ...bodies }, baseBodyId, outlines: { ...outlines }, images: { ...images }, sliders: { ...sliders } }],
     });
   },
 
@@ -249,7 +291,7 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
     }
 
     // Regenerate links
-    const newLinks = buildLinksRecord(generateBodyLinks(newBodies, newJoints));
+    const newLinks = buildLinksRecord(generateBodyLinks(newBodies, newJoints, get().sliders));
     updateJointConnections(newJoints, newLinks);
 
     set({ joints: newJoints, links: newLinks, bodies: newBodies, outlines: newOutlines });
@@ -277,11 +319,30 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
 
     delete newJoints[id];
 
+    // Remove sliders that reference this joint, and remove their other joints too
+    const newSliders = { ...get().sliders };
+    for (const [sid, slider] of Object.entries(newSliders)) {
+      if (slider.jointIdA === id || slider.jointIdB === id || slider.jointIdC === id) {
+        for (const jid of [slider.jointIdA, slider.jointIdB, slider.jointIdC]) {
+          if (jid !== id && newJoints[jid]) {
+            for (const bodyId of Object.keys(newBodies)) {
+              const body = newBodies[bodyId];
+              if (body.jointIds.includes(jid)) {
+                newBodies[bodyId] = { ...body, jointIds: body.jointIds.filter((j) => j !== jid) };
+              }
+            }
+            delete newJoints[jid];
+          }
+        }
+        delete newSliders[sid];
+      }
+    }
+
     // Regenerate links
-    const newLinks = buildLinksRecord(generateBodyLinks(newBodies, newJoints));
+    const newLinks = buildLinksRecord(generateBodyLinks(newBodies, newJoints, get().sliders));
     updateJointConnections(newJoints, newLinks);
 
-    set({ joints: newJoints, links: newLinks, bodies: newBodies, outlines: newOutlines });
+    set({ joints: newJoints, links: newLinks, bodies: newBodies, outlines: newOutlines, sliders: newSliders });
   },
 
   moveJoint(id, position) {
@@ -379,7 +440,7 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
 
     // Regenerate links and update joint types
     const newJoints = { ...get().joints };
-    const newLinks = buildLinksRecord(generateBodyLinks(newBodies, newJoints));
+    const newLinks = buildLinksRecord(generateBodyLinks(newBodies, newJoints, get().sliders));
     syncJointTypes(newJoints, newBodies, get().baseBodyId);
     updateJointConnections(newJoints, newLinks);
 
@@ -420,7 +481,7 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
     const newOutlines = { ...get().outlines };
     reprojectOutlines(newOutlines, bodyId, oldBodies[bodyId], newBodies[bodyId], get().joints, newJoints);
     syncJointTypes(newJoints, newBodies, get().baseBodyId);
-    const newLinks = buildLinksRecord(generateBodyLinks(newBodies, newJoints));
+    const newLinks = buildLinksRecord(generateBodyLinks(newBodies, newJoints, get().sliders));
     updateJointConnections(newJoints, newLinks);
 
     set({ bodies: newBodies, joints: newJoints, links: newLinks, outlines: newOutlines });
@@ -438,7 +499,7 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
     const newOutlines = { ...get().outlines };
     reprojectOutlines(newOutlines, bodyId, oldBodies[bodyId], newBodies[bodyId], get().joints, newJoints);
     syncJointTypes(newJoints, newBodies, get().baseBodyId);
-    const newLinks = buildLinksRecord(generateBodyLinks(newBodies, newJoints));
+    const newLinks = buildLinksRecord(generateBodyLinks(newBodies, newJoints, get().sliders));
     updateJointConnections(newJoints, newLinks);
 
     set({ bodies: newBodies, joints: newJoints, links: newLinks, outlines: newOutlines });
@@ -448,7 +509,7 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
     const { bodies, joints, baseBodyId } = get();
     const newJoints = { ...joints };
     syncJointTypes(newJoints, bodies, baseBodyId);
-    const newLinks = buildLinksRecord(generateBodyLinks(bodies, newJoints));
+    const newLinks = buildLinksRecord(generateBodyLinks(bodies, newJoints, get().sliders));
     updateJointConnections(newJoints, newLinks);
     set({ joints: newJoints, links: newLinks });
   },

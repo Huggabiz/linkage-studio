@@ -46,6 +46,16 @@ export interface CanvasImage {
   naturalHeight: number;    // original pixel height
 }
 
+/** A slider constraint: 3 joints (A, B, C) where A-C are rigid and B slides along AC. */
+export interface SliderConstraint {
+  readonly id: string;
+  jointIdA: string;
+  jointIdB: string;  // the slider joint (slides between A and C)
+  jointIdC: string;
+  /** B's parametric position along AC (0 = at A, 1 = at C) */
+  t: number;
+}
+
 export interface MechanismState {
   joints: Record<string, Joint>;
   links: Record<string, Link>;
@@ -53,4 +63,5 @@ export interface MechanismState {
   baseBodyId: string;
   outlines: Record<string, Outline>;
   images: Record<string, CanvasImage>;
+  sliders: Record<string, SliderConstraint>;
 }

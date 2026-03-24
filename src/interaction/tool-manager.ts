@@ -18,6 +18,11 @@ let dragJointId: string | null = null;
 let isPanning = false;
 let lastMouse: Vec2 = { x: 0, y: 0 };
 
+// Slider line drag state
+let sliderLineDragId: string | null = null;
+let sliderLineDragStart: Vec2 = { x: 0, y: 0 };
+let sliderLineDragStartPositions: { a: Vec2; b: Vec2; c: Vec2 } | null = null;
+
 // Image drag state
 let imageDragId: string | null = null;
 let imageDragType: 'move' | 'rotate' | 'scale' | null = null;
@@ -199,6 +204,31 @@ export function handleMouseDown(e: PointerEvent, canvas: HTMLCanvasElement) {
     return;
   }
 
+  // --- SLIDER TOOL ---
+  if (editor.createTool === 'slider') {
+    const pos = editor.gridEnabled ? snapToGrid(worldPos, editor.gridSize) : worldPos;
+
+    if (!editor.sliderPointA) {
+      // First click: place joint A
+      const activeBodyIds = Array.from(editor.activeBodyIds);
+      const jointId = mechanism.addJoint('revolute', pos, activeBodyIds);
+      editor.setSliderPointA({ position: pos, jointId });
+    } else {
+      // Second click: place joint C, auto-create B at midpoint, create slider constraint
+      const activeBodyIds = Array.from(editor.activeBodyIds);
+      const jointIdC = mechanism.addJoint('revolute', pos, activeBodyIds);
+      // B at midpoint, no body membership
+      const midPos = {
+        x: (editor.sliderPointA.position.x + pos.x) / 2,
+        y: (editor.sliderPointA.position.y + pos.y) / 2,
+      };
+      const jointIdB = mechanism.addJoint('revolute', midPos);
+      mechanism.addSlider(editor.sliderPointA.jointId, jointIdC, jointIdB);
+      editor.setSliderPointA(null);
+    }
+    return;
+  }
+
   // --- OUTLINE TOOL ---
   if (editor.createTool === 'outline') {
     const pos = editor.gridEnabled ? snapToGrid(worldPos, editor.gridSize) : worldPos;
@@ -276,7 +306,38 @@ export function handleMouseDown(e: PointerEvent, canvas: HTMLCanvasElement) {
   }
 
   // --- MANUAL JOINTS ---
+  // Check slider rail line hit first (before joint hit, so joints take priority via the joint check below)
   const joint = hitTestJoint(worldPos, mechanism.joints, editor.camera.zoom);
+  if (!joint) {
+    // Check if clicking on a slider rail line
+    for (const slider of Object.values(mechanism.sliders)) {
+      const jA = mechanism.joints[slider.jointIdA];
+      const jC = mechanism.joints[slider.jointIdC];
+      if (!jA || !jC) continue;
+      // Point-to-segment distance
+      const ab = sub(jC.position, jA.position);
+      const ap = sub(worldPos, jA.position);
+      const abLen = Math.sqrt(lengthSq(ab));
+      if (abLen < 1e-8) continue;
+      const t = Math.max(0, Math.min(1, dot(ap, ab) / lengthSq(ab)));
+      const closest = { x: jA.position.x + ab.x * t, y: jA.position.y + ab.y * t };
+      const dist = distance(worldPos, closest);
+      if (dist < HIT_RADIUS / editor.camera.zoom) {
+        // Start dragging the slider rail
+        sliderLineDragId = slider.id;
+        sliderLineDragStart = worldPos;
+        const jB = mechanism.joints[slider.jointIdB];
+        sliderLineDragStartPositions = {
+          a: { ...jA.position },
+          b: jB ? { ...jB.position } : { x: 0, y: 0 },
+          c: { ...jC.position },
+        };
+        mechanism.pushHistory();
+        return;
+      }
+    }
+  }
+
   if (joint) {
     if (e.shiftKey) {
       editor.toggleSelect(joint.id);
@@ -346,6 +407,31 @@ export function handleMouseMove(e: PointerEvent, canvas: HTMLCanvasElement) {
 
   // --- CREATE MODE ---
 
+  // Slider line dragging (translate all 3 joints)
+  if (sliderLineDragId && sliderLineDragStartPositions) {
+    const dx = worldPos.x - sliderLineDragStart.x;
+    const dy = worldPos.y - sliderLineDragStart.y;
+    const slider = mechanism.sliders[sliderLineDragId];
+    if (slider) {
+      let newA = { x: sliderLineDragStartPositions.a.x + dx, y: sliderLineDragStartPositions.a.y + dy };
+      let newB = { x: sliderLineDragStartPositions.b.x + dx, y: sliderLineDragStartPositions.b.y + dy };
+      let newC = { x: sliderLineDragStartPositions.c.x + dx, y: sliderLineDragStartPositions.c.y + dy };
+      if (editor.gridEnabled && !e.altKey) {
+        // Snap A to grid, translate B and C by same delta
+        const snappedA = snapToGrid(newA, editor.gridSize);
+        const snapDx = snappedA.x - newA.x;
+        const snapDy = snappedA.y - newA.y;
+        newA = snappedA;
+        newB = { x: newB.x + snapDx, y: newB.y + snapDy };
+        newC = { x: newC.x + snapDx, y: newC.y + snapDy };
+      }
+      mechanism.moveJoint(slider.jointIdA, newA);
+      mechanism.moveJoint(slider.jointIdB, newB);
+      mechanism.moveJoint(slider.jointIdC, newC);
+    }
+    return;
+  }
+
   // Image dragging
   if (imageDragId && imageDragType) {
     const img = mechanism.images[imageDragId];
@@ -381,7 +467,37 @@ export function handleMouseMove(e: PointerEvent, canvas: HTMLCanvasElement) {
 
   if (isDragging && dragJointId) {
     const pos = editor.gridEnabled && !e.altKey ? snapToGrid(worldPos, editor.gridSize) : worldPos;
-    mechanism.moveJoint(dragJointId, pos);
+
+    // Check if this joint is part of a slider
+    const slider = mechanism.getSliderForJoint(dragJointId);
+    if (slider) {
+      if (dragJointId === slider.jointIdB) {
+        // B: constrain to line AC
+        const jA = mechanism.joints[slider.jointIdA];
+        const jC = mechanism.joints[slider.jointIdC];
+        if (jA && jC) {
+          const ac = sub(jC.position, jA.position);
+          const ap = sub(pos, jA.position);
+          const acLenSq = lengthSq(ac);
+          const t = acLenSq > 1e-8 ? Math.max(0, Math.min(1, dot(ap, ac) / acLenSq)) : 0.5;
+          const constrained = { x: jA.position.x + ac.x * t, y: jA.position.y + ac.y * t };
+          mechanism.moveJoint(dragJointId, constrained);
+          mechanism.updateSliderT(slider.id, t);
+        }
+      } else {
+        // A or C: move freely, but maintain B's parametric t
+        mechanism.moveJoint(dragJointId, pos);
+        const jA = mechanism.joints[dragJointId === slider.jointIdA ? dragJointId : slider.jointIdA];
+        const jC = mechanism.joints[dragJointId === slider.jointIdC ? dragJointId : slider.jointIdC];
+        const posA = dragJointId === slider.jointIdA ? pos : jA.position;
+        const posC = dragJointId === slider.jointIdC ? pos : jC.position;
+        const t = slider.t;
+        const newB = { x: posA.x + (posC.x - posA.x) * t, y: posA.y + (posC.y - posA.y) * t };
+        mechanism.moveJoint(slider.jointIdB, newB);
+      }
+    } else {
+      mechanism.moveJoint(dragJointId, pos);
+    }
     return;
   }
 
@@ -409,6 +525,8 @@ export function handleMouseUp(_e: PointerEvent | MouseEvent) {
   isPanning = false;
   imageDragId = null;
   imageDragType = null;
+  sliderLineDragId = null;
+  sliderLineDragStartPositions = null;
 }
 
 export function handleWheel(e: WheelEvent, canvas: HTMLCanvasElement) {
@@ -447,7 +565,11 @@ export function handleKeyDown(e: KeyboardEvent) {
     switch (e.key) {
       case 'g': editor.toggleGrid(); return;
       case 'Escape':
-        if (editor.jointMode === 'autochain') {
+        if (editor.sliderPointA) {
+          // Cancel slider placement — remove the already-placed A joint
+          mechanism.undo(); // undo the addJoint for A
+          editor.setSliderPointA(null);
+        } else if (editor.jointMode === 'autochain') {
           editor.setJointMode('manual');
         } else if (editor.outlinePoints.length > 0) {
           editor.clearOutlinePoints();

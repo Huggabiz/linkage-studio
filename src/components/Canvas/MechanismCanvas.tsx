@@ -45,6 +45,7 @@ export function MechanismCanvas() {
         bodies: mechanism.bodies,
         outlines: mechanism.outlines,
         images: mechanism.images,
+        sliders: mechanism.sliders,
         selectedIds: editor.selectedIds,
         hoveredId: editor.hoveredId,
         camera: editor.camera,
@@ -68,6 +69,7 @@ export function MechanismCanvas() {
         gravityStrength: sim.gravityStrength,
         baseBodyId: mechanism.baseBodyId,
         frozenOutlinePoints: editor.lockOutlines ? editor.frozenOutlineWorldPoints : undefined,
+        sliderPointA: editor.sliderPointA?.position ?? null,
       });
     } catch (e) {
       console.error('Render error:', e);

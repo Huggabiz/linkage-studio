@@ -1,6 +1,6 @@
 import { useEditorStore } from '../../store/editor-store';
 import { useMechanismStore } from '../../store/mechanism-store';
-import { serializeMechanism, deserializeMechanism, downloadFile, openFilePicker } from '../../utils/file-io';
+import { serializeMechanism, deserializeMechanism, saveFileAs, openFilePicker } from '../../utils/file-io';
 import './TopBar.css';
 
 export function TopBar() {
@@ -15,10 +15,10 @@ export function TopBar() {
   const baseBodyId = useMechanismStore((s) => s.baseBodyId);
   const clearSelection = useEditorStore((s) => s.clearSelection);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const json = serializeMechanism(joints, links, bodies, baseBodyId, outlines);
     const timestamp = new Date().toISOString().slice(0, 16).replace(/[:-]/g, '');
-    downloadFile(json, `linkage_${timestamp}.slinker`);
+    await saveFileAs(json, `linkage_${timestamp}.slinker`);
   };
 
   const handleOpen = async () => {
@@ -83,7 +83,7 @@ export function TopBar() {
       <div className="top-bar-spacer" />
 
       <div className="top-bar-brand">
-        <span>Slinker v0.3.0</span>
+        <span>Slinker v0.4.0</span>
       </div>
     </div>
   );

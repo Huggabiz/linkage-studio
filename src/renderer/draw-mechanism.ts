@@ -1,4 +1,4 @@
-import type { Joint, Link, Body, Outline, Vec2 } from '../types';
+import type { Joint, Link, Body, Outline, SliderConstraint, Vec2 } from '../types';
 import { computeBodyTransform, localToWorld } from '../core/body-transform';
 import {
   JOINT_RADIUS, JOINT_RADIUS_FIXED, LINK_WIDTH,
@@ -92,12 +92,77 @@ export function drawJoint(
   }
 }
 
+/** Draw slider rail lines (grey lines between A and C). */
+export function drawSliderRails(
+  ctx: CanvasRenderingContext2D,
+  sliders: Record<string, SliderConstraint>,
+  joints: Record<string, Joint>,
+  zoom: number,
+) {
+  const SLIDER_COLOR = '#777';
+  for (const slider of Object.values(sliders)) {
+    const jA = joints[slider.jointIdA];
+    const jC = joints[slider.jointIdC];
+    if (!jA || !jC) continue;
+    ctx.beginPath();
+    ctx.moveTo(jA.position.x, jA.position.y);
+    ctx.lineTo(jC.position.x, jC.position.y);
+    ctx.strokeStyle = SLIDER_COLOR;
+    ctx.lineWidth = 3 / zoom;
+    ctx.lineCap = 'round';
+    ctx.setLineDash([8 / zoom, 4 / zoom]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+}
+
+/** Draw ghost preview during slider placement (A placed, cursor = C). */
+export function drawSliderGhost(
+  ctx: CanvasRenderingContext2D,
+  pointA: Vec2,
+  cursorWorld: Vec2 | null,
+  zoom: number,
+) {
+  if (!cursorWorld) return;
+  const midX = (pointA.x + cursorWorld.x) / 2;
+  const midY = (pointA.y + cursorWorld.y) / 2;
+
+  // Draw rail line
+  ctx.beginPath();
+  ctx.moveTo(pointA.x, pointA.y);
+  ctx.lineTo(cursorWorld.x, cursorWorld.y);
+  ctx.strokeStyle = '#777';
+  ctx.lineWidth = 3 / zoom;
+  ctx.setLineDash([8 / zoom, 4 / zoom]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Draw ghost B at midpoint
+  ctx.beginPath();
+  ctx.arc(midX, midY, 6 / zoom, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(153, 153, 153, 0.5)';
+  ctx.fill();
+  ctx.strokeStyle = '#999';
+  ctx.lineWidth = 1.5 / zoom;
+  ctx.stroke();
+
+  // Draw ghost C at cursor
+  ctx.beginPath();
+  ctx.arc(cursorWorld.x, cursorWorld.y, 6 / zoom, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(153, 153, 153, 0.5)';
+  ctx.fill();
+  ctx.strokeStyle = '#999';
+  ctx.lineWidth = 1.5 / zoom;
+  ctx.stroke();
+}
+
 export function drawMechanism(
   ctx: CanvasRenderingContext2D,
   joints: Record<string, Joint>,
   links: Record<string, Link>,
   bodies: Record<string, Body>,
   outlines: Record<string, Outline>,
+  sliders: Record<string, SliderConstraint>,
   selectedIds: Set<string>,
   hoveredId: string | null,
   zoom: number,
@@ -154,6 +219,9 @@ export function drawMechanism(
       drawLink(ctx, link, joints, zoom, linkColors.get(link.id) || '#666666');
     }
   }
+
+  // Draw slider rails
+  drawSliderRails(ctx, sliders, joints, zoom);
 
   // Draw outlines (use frozen points if outlines are locked)
   drawOutlines(ctx, Object.values(outlines), bodies, joints, zoom, selectedIds, frozenOutlinePoints);

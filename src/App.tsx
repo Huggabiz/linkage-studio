@@ -99,6 +99,7 @@ function App() {
           SIM_DT * sim.speed,
           fixedJointIds,
           jointGravityWeights,
+          mech.sliders,
         );
 
         sim.setSolverResult(result);

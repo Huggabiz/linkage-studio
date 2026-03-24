@@ -1,7 +1,7 @@
-import type { Joint, Link, Body, Outline, CanvasImage, Vec2, SimDragState, AppMode, ForceVector, CreateTool } from '../types';
+import type { Joint, Link, Body, Outline, CanvasImage, SliderConstraint, Vec2, SimDragState, AppMode, ForceVector, CreateTool } from '../types';
 import type { CameraState } from '../types';
 import { applyCamera, resetCamera } from './camera';
-import { drawMechanism, drawOutlineGhost } from './draw-mechanism';
+import { drawMechanism, drawOutlineGhost, drawSliderGhost } from './draw-mechanism';
 import { drawImages } from './draw-images';
 import { drawGrid, drawPathTraces, drawForceVectors, drawDragInteraction, drawModeBadge, drawHUD, clearCanvas, drawCOMMarkers } from './draw-overlays';
 import { lerp } from '../core/math/vec2';
@@ -13,6 +13,7 @@ export interface RenderState {
   bodies: Record<string, Body>;
   outlines: Record<string, Outline>;
   images: Record<string, CanvasImage>;
+  sliders: Record<string, SliderConstraint>;
   selectedIds: Set<string>;
   hoveredId: string | null;
   camera: CameraState;
@@ -33,6 +34,7 @@ export interface RenderState {
   gravityStrength: number;
   baseBodyId: string;
   frozenOutlinePoints?: Map<string, Vec2[]>;
+  sliderPointA?: Vec2 | null;
 }
 
 export function render(
@@ -53,13 +55,18 @@ export function render(
   // Draw images behind mechanism
   drawImages(ctx, state.images, state.camera.zoom, state.selectedIds);
 
-  drawMechanism(ctx, state.joints, state.links, state.bodies, state.outlines, state.selectedIds, state.hoveredId, state.camera.zoom, state.showLinks, state.baseBodyId, state.frozenOutlinePoints);
+  drawMechanism(ctx, state.joints, state.links, state.bodies, state.outlines, state.sliders, state.selectedIds, state.hoveredId, state.camera.zoom, state.showLinks, state.baseBodyId, state.frozenOutlinePoints);
 
   drawPathTraces(ctx, state.pathTraces, state.camera.zoom);
 
   // Outline ghost (in-progress drawing)
   if (state.mode === 'create' && state.createTool === 'outline' && state.outlinePoints.length > 0) {
     drawOutlineGhost(ctx, state.outlinePoints, state.cursorWorld, state.activeBodyColor, state.camera.zoom);
+  }
+
+  // Slider ghost (placing second point)
+  if (state.mode === 'create' && state.createTool === 'slider' && state.sliderPointA) {
+    drawSliderGhost(ctx, state.sliderPointA, state.cursorWorld, state.camera.zoom);
   }
 
   if (state.mode === 'simulate' && state.forceVectors.length > 0 && state.showVectors) {
