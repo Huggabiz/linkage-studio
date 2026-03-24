@@ -103,43 +103,77 @@ export function handleMouseDown(e: PointerEvent, canvas: HTMLCanvasElement) {
       return;
     }
 
-    // Outline (shape) hit: only non-overlapping, non-base body shapes
+    // Outline (shape) hit: find nearest body link and drag it directly
     const outlineHit = hitTestOutlineFilled(
       worldPos, mechanism.outlines, mechanism.bodies, mechanism.joints, mechanism.baseBodyId,
     );
     if (outlineHit) {
       const body = mechanism.bodies[outlineHit.bodyId];
       if (body) {
-        // Check body has at least one free joint (otherwise can't drag)
         const hasFreeJoint = body.jointIds.some((jid) => !isFixed(jid));
         if (!hasFreeJoint) return;
 
-        // Create a temporary joint at the grab point, attached to this body.
-        // Link regeneration will connect it to the body's other joints via
-        // distance constraints, so force propagates naturally.
-        const tempId = mechanism.addTempJoint(worldPos, body.id);
+        // Find the nearest link belonging to this body
+        let bestLink: { linkId: string; t: number; jointId: string } | null = null;
+        let bestDist = Infinity;
+        for (const link of Object.values(mechanism.links)) {
+          const [idA, idB] = link.jointIds;
+          if (!body.jointIds.includes(idA) || !body.jointIds.includes(idB)) continue;
+          const jA = mechanism.joints[idA];
+          const jB = mechanism.joints[idB];
+          if (!jA || !jB) continue;
 
-        // Re-read mechanism state after temp joint was added
-        const mech2 = useMechanismStore.getState();
-        const tempJoint = mech2.joints[tempId];
-        if (!tempJoint) return;
+          const ab = sub(jB.position, jA.position);
+          const ap = sub(worldPos, jA.position);
+          const abLenSq = lengthSq(ab);
+          const t = abLenSq > 1e-8 ? Math.max(0, Math.min(1, dot(ap, ab) / abLenSq)) : 0.5;
+          const closest = { x: jA.position.x + ab.x * t, y: jA.position.y + ab.y * t };
+          const d = distance(worldPos, closest);
+          if (d < bestDist) {
+            bestDist = d;
+            const jointId = isFixed(idA) ? idB : (isFixed(idB) ? idA : (t <= 0.5 ? idA : idB));
+            bestLink = { linkId: link.id, t, jointId };
+          }
+        }
 
-        // Find a link connected to the temp joint
-        const linkId = tempJoint.connectedLinkIds[0] || null;
-        let grabT = 0;
-        if (linkId) {
-          const link = mech2.links[linkId];
-          if (link) grabT = link.jointIds[0] === tempId ? 0 : 1;
+        // Fallback: if no link found, use nearest free joint directly
+        if (!bestLink) {
+          let nearestJoint: string | null = null;
+          let nearestDist = Infinity;
+          for (const jid of body.jointIds) {
+            if (isFixed(jid)) continue;
+            const j = mechanism.joints[jid];
+            if (!j) continue;
+            const d = distance(worldPos, j.position);
+            if (d < nearestDist) { nearestDist = d; nearestJoint = jid; }
+          }
+          if (nearestJoint) {
+            const j = mechanism.joints[nearestJoint];
+            const linkId = j.connectedLinkIds[0] || null;
+            let grabT = 0;
+            if (linkId) {
+              const link = mechanism.links[linkId];
+              if (link) grabT = link.jointIds[0] === nearestJoint ? 0 : 1;
+            }
+            editor.setSimDrag({
+              active: true,
+              grabPoint: worldPos,
+              cursorPoint: worldPos,
+              jointId: nearestJoint,
+              linkId,
+              grabT,
+            });
+          }
+          return;
         }
 
         editor.setSimDrag({
           active: true,
           grabPoint: worldPos,
           cursorPoint: worldPos,
-          jointId: tempId,
-          linkId,
-          grabT,
-          tempJointId: tempId,
+          jointId: bestLink.jointId,
+          linkId: bestLink.linkId,
+          grabT: bestLink.t,
         });
       }
     }

@@ -1,4 +1,4 @@
-import type { Joint, Link, Body, Outline, Vec2 } from '../types';
+import type { Joint, Link, Body, Outline, CanvasImage, SliderConstraint, Vec2 } from '../types';
 
 /** Serializable format for a linkage file (.slinker) */
 interface SlinkerFile {
@@ -8,6 +8,8 @@ interface SlinkerFile {
   bodies: Record<string, { id: string; name: string; color: string; jointIds: string[]; useOutlineCOM: boolean }>;
   baseBodyId: string;
   outlines: Record<string, { id: string; bodyId: string; name?: string; points: Vec2[] }>;
+  images?: Record<string, { id: string; bodyId: string; src: string; position: Vec2; scale: number; rotation: number; opacity: number; visible: boolean; naturalWidth: number; naturalHeight: number }>;
+  sliders?: Record<string, { id: string; jointIdA: string; jointIdB: string; jointIdC: string; t: number }>;
 }
 
 export function serializeMechanism(
@@ -16,6 +18,8 @@ export function serializeMechanism(
   bodies: Record<string, Body>,
   baseBodyId: string,
   outlines: Record<string, Outline>,
+  images?: Record<string, CanvasImage>,
+  sliders?: Record<string, SliderConstraint>,
 ): string {
   const data: SlinkerFile = {
     version: '0.4.0',
@@ -39,6 +43,25 @@ export function serializeMechanism(
     data.outlines[id] = { id: o.id, bodyId: o.bodyId, name: o.name, points: o.points.map(p => ({ x: p.x, y: p.y })) };
   }
 
+  if (images && Object.keys(images).length > 0) {
+    data.images = {};
+    for (const [id, img] of Object.entries(images)) {
+      data.images[id] = {
+        id: img.id, bodyId: img.bodyId, src: img.src,
+        position: { x: img.position.x, y: img.position.y },
+        scale: img.scale, rotation: img.rotation, opacity: img.opacity,
+        visible: img.visible, naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight,
+      };
+    }
+  }
+
+  if (sliders && Object.keys(sliders).length > 0) {
+    data.sliders = {};
+    for (const [id, s] of Object.entries(sliders)) {
+      data.sliders[id] = { id: s.id, jointIdA: s.jointIdA, jointIdB: s.jointIdB, jointIdC: s.jointIdC, t: s.t };
+    }
+  }
+
   return JSON.stringify(data, null, 2);
 }
 
@@ -48,6 +71,8 @@ export function deserializeMechanism(json: string): {
   bodies: Record<string, Body>;
   baseBodyId: string;
   outlines: Record<string, Outline>;
+  images?: Record<string, CanvasImage>;
+  sliders?: Record<string, SliderConstraint>;
 } | null {
   try {
     const data: SlinkerFile = JSON.parse(json);
@@ -94,7 +119,26 @@ export function deserializeMechanism(json: string): {
       };
     }
 
-    return { joints, links, bodies, baseBodyId: data.baseBodyId, outlines };
+    const images: Record<string, CanvasImage> = {};
+    if (data.images) {
+      for (const [id, img] of Object.entries(data.images)) {
+        images[id] = {
+          id: img.id, bodyId: img.bodyId, src: img.src,
+          position: { x: img.position.x, y: img.position.y },
+          scale: img.scale, rotation: img.rotation, opacity: img.opacity,
+          visible: img.visible, naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight,
+        };
+      }
+    }
+
+    const sliders: Record<string, SliderConstraint> = {};
+    if (data.sliders) {
+      for (const [id, s] of Object.entries(data.sliders)) {
+        sliders[id] = { id: s.id, jointIdA: s.jointIdA, jointIdB: s.jointIdB, jointIdC: s.jointIdC, t: s.t };
+      }
+    }
+
+    return { joints, links, bodies, baseBodyId: data.baseBodyId, outlines, images, sliders };
   } catch {
     return null;
   }
