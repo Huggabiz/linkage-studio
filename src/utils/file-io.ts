@@ -7,7 +7,7 @@ interface SlinkerFile {
   links: Record<string, { id: string; jointIds: [string, string]; restLength: number; mass: number }>;
   bodies: Record<string, { id: string; name: string; color: string; jointIds: string[]; useOutlineCOM: boolean }>;
   baseBodyId: string;
-  outlines: Record<string, { id: string; bodyId: string; points: Vec2[] }>;
+  outlines: Record<string, { id: string; bodyId: string; name?: string; points: Vec2[] }>;
 }
 
 export function serializeMechanism(
@@ -18,7 +18,7 @@ export function serializeMechanism(
   outlines: Record<string, Outline>,
 ): string {
   const data: SlinkerFile = {
-    version: '0.2.0',
+    version: '0.3.0',
     joints: {},
     links: {},
     bodies: {},
@@ -36,7 +36,7 @@ export function serializeMechanism(
     data.bodies[id] = { id: b.id, name: b.name, color: b.color, jointIds: [...b.jointIds], useOutlineCOM: b.useOutlineCOM };
   }
   for (const [id, o] of Object.entries(outlines)) {
-    data.outlines[id] = { id: o.id, bodyId: o.bodyId, points: o.points.map(p => ({ x: p.x, y: p.y })) };
+    data.outlines[id] = { id: o.id, bodyId: o.bodyId, name: o.name, points: o.points.map(p => ({ x: p.x, y: p.y })) };
   }
 
   return JSON.stringify(data, null, 2);
@@ -89,6 +89,7 @@ export function deserializeMechanism(json: string): {
       outlines[id] = {
         id: o.id,
         bodyId: o.bodyId,
+        name: o.name || `Shape ${Object.keys(outlines).length + 1}`,
         points: o.points.map(p => ({ x: p.x, y: p.y })),
       };
     }

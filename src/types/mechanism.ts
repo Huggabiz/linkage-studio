@@ -29,6 +29,7 @@ export interface Body {
 export interface Outline {
   readonly id: string;
   bodyId: string;
+  name: string;
   points: Vec2[];  // local coordinates relative to body reference frame
 }
 
