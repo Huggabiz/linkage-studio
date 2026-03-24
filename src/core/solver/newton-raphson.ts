@@ -349,7 +349,8 @@ export function solveWithForce(
         if (isFreeJ) { predicted[idxJ!] -= cx; predicted[idxJ! + 1] -= cy; }
       }
 
-      // Slider constraints: project B onto line AC, enforce A-C distance
+      // Slider constraints: B must lie on line AC.
+      // Bidirectional — if B is fixed, A and C are pushed so AC passes through B.
       for (const slider of sliderArray) {
         const idxA = jointIndex.get(slider.jointIdA);
         const idxB = jointIndex.get(slider.jointIdB);
@@ -359,29 +360,76 @@ export function solveWithForce(
         const jC = joints[slider.jointIdC];
         if (!jA || !jB || !jC) continue;
 
-        // Current predicted positions
-        const ax = idxA !== undefined ? predicted[idxA] : jA.position.x;
-        const ay = idxA !== undefined ? predicted[idxA + 1] : jA.position.y;
-        let bx = idxB !== undefined ? predicted[idxB] : jB.position.x;
-        let by = idxB !== undefined ? predicted[idxB + 1] : jB.position.y;
-        const cx2 = idxC !== undefined ? predicted[idxC] : jC.position.x;
-        const cy2 = idxC !== undefined ? predicted[idxC + 1] : jC.position.y;
+        const freeA = idxA !== undefined;
+        const freeB = idxB !== undefined;
+        const freeC = idxC !== undefined;
 
-        // Project B onto line segment AC
+        // Current predicted positions
+        const ax = freeA ? predicted[idxA!] : jA.position.x;
+        const ay = freeA ? predicted[idxA! + 1] : jA.position.y;
+        const bx = freeB ? predicted[idxB!] : jB.position.x;
+        const by = freeB ? predicted[idxB! + 1] : jB.position.y;
+        const cx2 = freeC ? predicted[idxC!] : jC.position.x;
+        const cy2 = freeC ? predicted[idxC! + 1] : jC.position.y;
+
+        // Direction along AC
         const acx = cx2 - ax;
         const acy = cy2 - ay;
         const acLenSq = acx * acx + acy * acy;
         if (acLenSq < 1e-8) continue;
+        const acLen = Math.sqrt(acLenSq);
 
+        // Unit vectors: along AC and perpendicular
+        const ux = acx / acLen;
+        const uy = acy / acLen;
+        const perpX = -uy;
+        const perpY = ux;
+
+        // B's offset from line AC (perpendicular distance, signed)
         const abx = bx - ax;
         const aby = by - ay;
-        const t = Math.max(0, Math.min(1, (abx * acx + aby * acy) / acLenSq));
-        const projBx = ax + acx * t;
-        const projBy = ay + acy * t;
+        const perpDist = abx * perpX + aby * perpY;
 
-        if (idxB !== undefined) {
-          predicted[idxB] = projBx;
-          predicted[idxB + 1] = projBy;
+        // If perpDist ≈ 0, B is already on the line
+        if (Math.abs(perpDist) < 1e-10) {
+          // Still project B to clamp within segment
+          if (freeB) {
+            const tParam = Math.max(0, Math.min(1, (abx * ux + aby * uy) / acLen));
+            predicted[idxB!] = ax + acx * tParam;
+            predicted[idxB! + 1] = ay + acy * tParam;
+          }
+          continue;
+        }
+
+        // Count free participants to distribute the correction
+        const wB = freeB ? 1 : 0;
+        const wAC = (freeA ? 1 : 0) + (freeC ? 1 : 0);
+        const totalW = wB + wAC;
+        if (totalW === 0) continue;
+
+        // Correction: move B toward line, move A&C away from B (perpendicular)
+        // B gets corrected by -perpDist * (wAC / totalW) toward line
+        // A and C each get pushed by +perpDist * (wB / totalW) / numFreeAC in perp direction
+        const bCorrection = perpDist * (wAC > 0 ? (wAC / totalW) : (totalW > 0 ? 1 : 0));
+        const acCorrection = wAC > 0 ? perpDist * (wB > 0 ? (wB / totalW) : (totalW > 0 ? 1 : 0)) / wAC : 0;
+
+        if (freeB) {
+          // Move B onto line, then clamp to segment
+          const newBx = bx - perpX * bCorrection;
+          const newBy = by - perpY * bCorrection;
+          const nbx = newBx - ax;
+          const nby = newBy - ay;
+          const tParam = Math.max(0, Math.min(1, (nbx * ux + nby * uy) / acLen));
+          predicted[idxB!] = ax + acx * tParam;
+          predicted[idxB! + 1] = ay + acy * tParam;
+        }
+        if (freeA) {
+          predicted[idxA!] += perpX * acCorrection;
+          predicted[idxA! + 1] += perpY * acCorrection;
+        }
+        if (freeC) {
+          predicted[idxC!] += perpX * acCorrection;
+          predicted[idxC! + 1] += perpY * acCorrection;
         }
       }
     }
