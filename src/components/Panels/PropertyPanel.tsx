@@ -51,7 +51,7 @@ export function PropertyPanel() {
     const body = bodies[outline.bodyId];
     return (
       <div className="panel-content">
-        <div className="panel-title">Outline</div>
+        <div className="panel-title">{outline.name || 'Shape'}</div>
         <div className="panel-info">Body: {body?.name ?? 'Unknown'}</div>
         <div className="panel-info">{outline.points.length} vertices</div>
       </div>

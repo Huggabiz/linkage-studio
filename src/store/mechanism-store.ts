@@ -49,6 +49,7 @@ interface MechanismStore {
 
   addOutline(bodyId: string, localPoints: Vec2[]): string;
   removeOutline(id: string): void;
+  renameOutline(id: string, name: string): void;
   toggleOutlineCOM(bodyId: string): void;
 
   addImage(bodyId: string, src: string, naturalWidth: number, naturalHeight: number, position: Vec2): string;
@@ -455,9 +456,21 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
   addOutline(bodyId, localPoints) {
     const id = createId();
     get().pushHistory();
-    const outline: Outline = { id, bodyId, points: localPoints };
+    // Auto-name: find next available "Shape N"
+    const existingNames = new Set(Object.values(get().outlines).map((o) => o.name));
+    let num = 1;
+    while (existingNames.has(`Shape ${num}`)) num++;
+    const outline: Outline = { id, bodyId, name: `Shape ${num}`, points: localPoints };
     set((s) => ({ outlines: { ...s.outlines, [id]: outline } }));
     return id;
+  },
+
+  renameOutline(id, name) {
+    set((s) => {
+      const outline = s.outlines[id];
+      if (!outline) return s;
+      return { outlines: { ...s.outlines, [id]: { ...outline, name } } };
+    });
   },
 
   removeOutline(id) {

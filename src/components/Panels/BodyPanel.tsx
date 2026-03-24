@@ -3,6 +3,49 @@ import { useEditorStore } from '../../store/editor-store';
 import { useMechanismStore } from '../../store/mechanism-store';
 import { BODY_COLORS } from '../../utils/constants';
 
+/** Pencil/edit SVG icon */
+function PencilIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+      <path d="m15 5 4 4"/>
+    </svg>
+  );
+}
+
+/** Eye open SVG icon */
+function EyeIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+      <circle cx="12" cy="12" r="3"/>
+    </svg>
+  );
+}
+
+/** Eye closed SVG icon */
+function EyeOffIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+      <line x1="1" y1="1" x2="23" y2="23"/>
+    </svg>
+  );
+}
+
+/** Chevron icon for collapse/expand */
+function ChevronIcon({ expanded }: { expanded: boolean }) {
+  return (
+    <svg
+      width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+      style={{ transition: 'transform 0.15s', transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)', flexShrink: 0 }}
+    >
+      <polyline points="9 18 15 12 9 6"/>
+    </svg>
+  );
+}
+
 export function BodyPanel() {
   const bodies = useMechanismStore((s) => s.bodies);
   const joints = useMechanismStore((s) => s.joints);
@@ -16,20 +59,23 @@ export function BodyPanel() {
   const removeJointFromBody = useMechanismStore((s) => s.removeJointFromBody);
   const addBody = useMechanismStore((s) => s.addBody);
   const toggleOutlineCOM = useMechanismStore((s) => s.toggleOutlineCOM);
+  const removeOutline = useMechanismStore((s) => s.removeOutline);
+  const renameOutline = useMechanismStore((s) => s.renameOutline);
   const updateImage = useMechanismStore((s) => s.updateImage);
   const removeImage = useMechanismStore((s) => s.removeImage);
   const activeBodyIds = useEditorStore((s) => s.activeBodyIds);
   const toggleActiveBody = useEditorStore((s) => s.toggleActiveBody);
   const setActiveBody = useEditorStore((s) => s.setActiveBody);
   const selectedIds = useEditorStore((s) => s.selectedIds);
+  const select = useEditorStore((s) => s.select);
   const createTool = useEditorStore((s) => s.createTool);
 
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [collapsedBodies, setCollapsedBodies] = useState<Set<string>>(new Set());
 
   const usedColors = new Set(Object.values(bodies).map((b) => b.color));
   const isOutlineMode = createTool === 'outline';
 
-  // Find selected joint (if any)
   const selectedJointId = [...selectedIds].find((id) => joints[id]);
 
   const bodyList = Object.values(bodies);
@@ -39,11 +85,14 @@ export function BodyPanel() {
     return 0;
   });
 
-  // Count outlines per body
-  const outlineCount = new Map<string, number>();
-  for (const o of Object.values(outlines)) {
-    outlineCount.set(o.bodyId, (outlineCount.get(o.bodyId) || 0) + 1);
-  }
+  const toggleCollapsed = (bodyId: string) => {
+    setCollapsedBodies((prev) => {
+      const next = new Set(prev);
+      if (next.has(bodyId)) next.delete(bodyId);
+      else next.add(bodyId);
+      return next;
+    });
+  };
 
   return (
     <div className="panel-content">
@@ -62,21 +111,36 @@ export function BodyPanel() {
         const isBase = body.id === baseBodyId;
         const isEditing = editingId === body.id;
         const jointInBody = selectedJointId ? body.jointIds.includes(selectedJointId) : false;
-        const oCount = outlineCount.get(body.id) || 0;
+        const bodyOutlines = Object.values(outlines).filter((o) => o.bodyId === body.id);
         const bodyImages = Object.values(images).filter((img) => img.bodyId === body.id);
+        const hasChildren = bodyOutlines.length > 0 || bodyImages.length > 0;
+        const isCollapsed = collapsedBodies.has(body.id);
 
         return (
           <div key={body.id}>
+            {/* Body row */}
             <div
               style={{
                 display: 'flex', alignItems: 'center', gap: 4,
-                padding: '3px 6px', marginBottom: 2, borderRadius: 4,
+                padding: '3px 6px', marginBottom: 1, borderRadius: 4,
                 backgroundColor: isActive ? 'rgba(255,255,255,0.1)' : 'transparent',
                 cursor: 'pointer',
               }}
               onClick={() => isOutlineMode ? setActiveBody(body.id) : toggleActiveBody(body.id)}
             >
-              {/* Selection control: radio in outline mode, checkbox in joints mode */}
+              {/* Collapse chevron */}
+              {hasChildren ? (
+                <span
+                  onClick={(e) => { e.stopPropagation(); toggleCollapsed(body.id); }}
+                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#777' }}
+                >
+                  <ChevronIcon expanded={!isCollapsed} />
+                </span>
+              ) : (
+                <span style={{ width: 10, flexShrink: 0 }} />
+              )}
+
+              {/* Selection control */}
               {isOutlineMode ? (
                 <input
                   type="radio"
@@ -93,11 +157,8 @@ export function BodyPanel() {
                   onChange={(e) => {
                     e.stopPropagation();
                     if (selectedJointId) {
-                      if (jointInBody) {
-                        removeJointFromBody(selectedJointId, body.id);
-                      } else {
-                        addJointToBody(selectedJointId, body.id);
-                      }
+                      if (jointInBody) removeJointFromBody(selectedJointId, body.id);
+                      else addJointToBody(selectedJointId, body.id);
                     } else {
                       toggleActiveBody(body.id);
                     }
@@ -145,11 +206,13 @@ export function BodyPanel() {
                 </span>
               )}
 
-              {/* Counts + COM toggle */}
+              {/* Joint count */}
               <span style={{ fontSize: 10, opacity: 0.6 }}>
-                {body.jointIds.length}j{oCount > 0 ? ` ${oCount}o` : ''}
+                {body.jointIds.length}j
               </span>
-              {oCount > 0 && (
+
+              {/* CoA toggle */}
+              {bodyOutlines.length > 0 && (
                 <span
                   title={body.useOutlineCOM ? 'Using outline center of area for gravity' : 'Using joint centroid for gravity'}
                   style={{
@@ -163,15 +226,15 @@ export function BodyPanel() {
                 </span>
               )}
 
-              {/* Edit + Delete */}
+              {/* Edit (pencil) + Delete */}
               {!isBase && !isEditing && (
                 <button
                   className="tool-btn"
-                  style={{ fontSize: 10, padding: '1px 4px' }}
+                  style={{ padding: '1px 3px', display: 'flex', alignItems: 'center' }}
                   onClick={(e) => { e.stopPropagation(); setEditingId(body.id); }}
                   title="Rename body"
                 >
-                  e
+                  <PencilIcon />
                 </button>
               )}
               {!isBase && (
@@ -186,77 +249,137 @@ export function BodyPanel() {
               )}
             </div>
 
-            {/* Images belonging to this body */}
-            {bodyImages.map((img) => (
-              <div
-                key={img.id}
-                style={{
-                  display: 'flex', flexDirection: 'column', gap: 3,
-                  marginLeft: 20, padding: '3px 6px', marginBottom: 2,
-                  borderRadius: 4, fontSize: 11,
-                  backgroundColor: selectedIds.has(img.id) ? 'rgba(74,158,255,0.15)' : 'transparent',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  {/* Eye toggle */}
-                  <button
-                    onClick={() => updateImage(img.id, { visible: !img.visible })}
-                    title={img.visible ? 'Hide image' : 'Show image'}
+            {/* Collapsible children: outlines + images */}
+            {hasChildren && !isCollapsed && (
+              <div style={{ marginLeft: 14 }}>
+                {/* Outlines */}
+                {bodyOutlines.map((outline) => {
+                  const isOutlineEditing = editingId === outline.id;
+                  const isSelected = selectedIds.has(outline.id);
+                  return (
+                    <div
+                      key={outline.id}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 4,
+                        padding: '2px 6px', marginBottom: 1, borderRadius: 3,
+                        fontSize: 11, cursor: 'pointer',
+                        backgroundColor: isSelected ? 'rgba(74,158,255,0.15)' : 'transparent',
+                      }}
+                      onClick={() => select(outline.id)}
+                    >
+                      {/* Shape icon (small polygon) */}
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={body.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                        <polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5"/>
+                      </svg>
+
+                      {/* Name */}
+                      {isOutlineEditing ? (
+                        <input
+                          autoFocus
+                          value={outline.name}
+                          onChange={(e) => renameOutline(outline.id, e.target.value)}
+                          onBlur={() => setEditingId(null)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') setEditingId(null); }}
+                          onClick={(e) => e.stopPropagation()}
+                          style={{
+                            flex: 1, fontSize: 11, background: 'rgba(255,255,255,0.1)', border: '1px solid #666',
+                            color: 'inherit', outline: 'none', padding: '0 4px', borderRadius: 2,
+                          }}
+                        />
+                      ) : (
+                        <span style={{ flex: 1, color: '#aaa', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {outline.name}
+                        </span>
+                      )}
+
+                      <span style={{ fontSize: 9, opacity: 0.5 }}>{outline.points.length}v</span>
+
+                      {/* Rename */}
+                      {!isOutlineEditing && (
+                        <button
+                          className="tool-btn"
+                          style={{ padding: '0px 2px', display: 'flex', alignItems: 'center' }}
+                          onClick={(e) => { e.stopPropagation(); setEditingId(outline.id); }}
+                          title="Rename shape"
+                        >
+                          <PencilIcon />
+                        </button>
+                      )}
+
+                      {/* Delete */}
+                      <button
+                        className="tool-btn"
+                        style={{ fontSize: 10, padding: '1px 4px' }}
+                        onClick={(e) => { e.stopPropagation(); removeOutline(outline.id); }}
+                        title="Delete shape"
+                      >
+                        x
+                      </button>
+                    </div>
+                  );
+                })}
+
+                {/* Images */}
+                {bodyImages.map((img) => (
+                  <div
+                    key={img.id}
                     style={{
-                      background: 'none', border: 'none', cursor: 'pointer',
-                      padding: '0 2px', fontSize: 14, color: img.visible ? '#aaa' : '#555',
-                      lineHeight: 1,
+                      display: 'flex', flexDirection: 'column', gap: 3,
+                      padding: '2px 6px', marginBottom: 1,
+                      borderRadius: 3, fontSize: 11,
+                      backgroundColor: selectedIds.has(img.id) ? 'rgba(74,158,255,0.15)' : 'transparent',
                     }}
                   >
-                    {img.visible ? (
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                        <circle cx="12" cy="12" r="3"/>
-                      </svg>
-                    ) : (
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
-                        <line x1="1" y1="1" x2="23" y2="23"/>
-                      </svg>
-                    )}
-                  </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      {/* Eye toggle */}
+                      <button
+                        onClick={() => updateImage(img.id, { visible: !img.visible })}
+                        title={img.visible ? 'Hide image' : 'Show image'}
+                        style={{
+                          background: 'none', border: 'none', cursor: 'pointer',
+                          padding: '0 1px', color: img.visible ? '#aaa' : '#555',
+                          lineHeight: 1, display: 'flex', alignItems: 'center',
+                        }}
+                      >
+                        {img.visible ? <EyeIcon /> : <EyeOffIcon />}
+                      </button>
 
-                  <span style={{ flex: 1, color: '#aaa', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    Image
-                  </span>
+                      <span style={{ flex: 1, color: '#aaa', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        Image
+                      </span>
 
-                  {/* Delete image */}
-                  <button
-                    className="tool-btn"
-                    style={{ fontSize: 10, padding: '1px 4px' }}
-                    onClick={() => removeImage(img.id)}
-                    title="Remove image"
-                  >
-                    x
-                  </button>
-                </div>
+                      <button
+                        className="tool-btn"
+                        style={{ fontSize: 10, padding: '1px 4px' }}
+                        onClick={() => removeImage(img.id)}
+                        title="Remove image"
+                      >
+                        x
+                      </button>
+                    </div>
 
-                {/* Opacity slider */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4, paddingLeft: 2 }}>
-                  <span style={{ fontSize: 10, color: '#777', width: 42 }}>Opacity</span>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={Math.round(img.opacity * 100)}
-                    onChange={(e) => updateImage(img.id, { opacity: Number(e.target.value) / 100 })}
-                    style={{ flex: 1, height: 12, accentColor: '#2196F3' }}
-                  />
-                  <span style={{ fontSize: 10, color: '#777', width: 24, textAlign: 'right' }}>
-                    {Math.round(img.opacity * 100)}%
-                  </span>
-                </div>
+                    {/* Opacity slider */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, paddingLeft: 2 }}>
+                      <span style={{ fontSize: 10, color: '#777', width: 42 }}>Opacity</span>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={Math.round(img.opacity * 100)}
+                        onChange={(e) => updateImage(img.id, { opacity: Number(e.target.value) / 100 })}
+                        style={{ flex: 1, height: 12, accentColor: '#2196F3' }}
+                      />
+                      <span style={{ fontSize: 10, color: '#777', width: 24, textAlign: 'right' }}>
+                        {Math.round(img.opacity * 100)}%
+                      </span>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
         );
       })}
-
     </div>
   );
 }

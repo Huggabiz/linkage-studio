@@ -83,7 +83,7 @@ export function TopBar() {
       <div className="top-bar-spacer" />
 
       <div className="top-bar-brand">
-        <span>Slinker v0.2.0</span>
+        <span>Slinker v0.3.0</span>
       </div>
     </div>
   );
