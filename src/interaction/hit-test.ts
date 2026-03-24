@@ -85,7 +85,7 @@ export function hitTestOutline(
 
   for (const outline of Object.values(outlines)) {
     const body = bodies[outline.bodyId];
-    if (!body || outline.points.length < 2) continue;
+    if (!body || outline.points.length < 2 || !outline.visible) continue;
     const transform = computeBodyTransform(body, joints);
     const worldPts = outline.points.map((p) => localToWorld(p, transform));
 
@@ -131,7 +131,7 @@ export function hitTestOutlineFilled(
   const outlinePolygons: { outline: Outline; worldPts: Vec2[] }[] = [];
   for (const outline of Object.values(outlines)) {
     const body = bodies[outline.bodyId];
-    if (!body || outline.points.length < 3) continue;
+    if (!body || outline.points.length < 3 || !outline.visible) continue;
     const transform = computeBodyTransform(body, joints);
     const worldPts = outline.points.map((p) => localToWorld(p, transform));
     outlinePolygons.push({ outline, worldPts });

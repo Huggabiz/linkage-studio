@@ -61,6 +61,8 @@ export function BodyPanel() {
   const toggleOutlineCOM = useMechanismStore((s) => s.toggleOutlineCOM);
   const removeOutline = useMechanismStore((s) => s.removeOutline);
   const renameOutline = useMechanismStore((s) => s.renameOutline);
+  const toggleBodyShowLinks = useMechanismStore((s) => s.toggleBodyShowLinks);
+  const toggleOutlineVisible = useMechanismStore((s) => s.toggleOutlineVisible);
   const updateImage = useMechanismStore((s) => s.updateImage);
   const removeImage = useMechanismStore((s) => s.removeImage);
   const activeBodyIds = useEditorStore((s) => s.activeBodyIds);
@@ -211,6 +213,25 @@ export function BodyPanel() {
                 {body.jointIds.length}j
               </span>
 
+              {/* Link visibility toggle */}
+              {!isBase && body.jointIds.length >= 2 && (
+                <span
+                  title={body.showLinks ? 'Hide links for this body' : 'Show links for this body'}
+                  style={{
+                    fontSize: 9, padding: '0 3px', borderRadius: 2, cursor: 'pointer',
+                    backgroundColor: body.showLinks ? 'rgba(255,255,255,0.05)' : 'rgba(255,100,100,0.2)',
+                    color: body.showLinks ? 'inherit' : '#f66',
+                    opacity: body.showLinks ? 0.6 : 1,
+                  }}
+                  onClick={(e) => { e.stopPropagation(); toggleBodyShowLinks(body.id); }}
+                >
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}>
+                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                  </svg>
+                </span>
+              )}
+
               {/* CoA toggle */}
               {bodyOutlines.length > 0 && (
                 <span
@@ -267,8 +288,21 @@ export function BodyPanel() {
                       }}
                       onClick={() => select(outline.id)}
                     >
+                      {/* Eye toggle for shape */}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); toggleOutlineVisible(outline.id); }}
+                        title={outline.visible ? 'Hide shape' : 'Show shape'}
+                        style={{
+                          background: 'none', border: 'none', cursor: 'pointer',
+                          padding: '0 1px', color: outline.visible ? '#aaa' : '#555',
+                          lineHeight: 1, display: 'flex', alignItems: 'center',
+                        }}
+                      >
+                        {outline.visible ? <EyeIcon /> : <EyeOffIcon />}
+                      </button>
+
                       {/* Shape icon (small polygon) */}
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={body.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={body.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: outline.visible ? 1 : 0.3 }}>
                         <polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5"/>
                       </svg>
 

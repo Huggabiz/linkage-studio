@@ -7,9 +7,9 @@ interface SlinkerFile {
   version: string;
   joints: Record<string, { id: string; type: string; position: Vec2; connectedLinkIds: string[] }>;
   links: Record<string, { id: string; jointIds: [string, string]; restLength: number; mass: number }>;
-  bodies: Record<string, { id: string; name: string; color: string; jointIds: string[]; useOutlineCOM: boolean }>;
+  bodies: Record<string, { id: string; name: string; color: string; jointIds: string[]; useOutlineCOM: boolean; showLinks?: boolean }>;
   baseBodyId: string;
-  outlines: Record<string, { id: string; bodyId: string; name?: string; points: Vec2[] }>;
+  outlines: Record<string, { id: string; bodyId: string; name?: string; visible?: boolean; points: Vec2[] }>;
   images?: Record<string, { id: string; bodyId: string; src: string; position: Vec2; scale: number; rotation: number; opacity: number; visible: boolean; naturalWidth: number; naturalHeight: number }>;
   sliders?: Record<string, { id: string; jointIdA: string; jointIdB: string; jointIdC: string; t: number }>;
 }
@@ -39,10 +39,10 @@ export function serializeMechanism(
     data.links[id] = { id: l.id, jointIds: [l.jointIds[0], l.jointIds[1]], restLength: l.restLength, mass: l.mass };
   }
   for (const [id, b] of Object.entries(bodies)) {
-    data.bodies[id] = { id: b.id, name: b.name, color: b.color, jointIds: [...b.jointIds], useOutlineCOM: b.useOutlineCOM };
+    data.bodies[id] = { id: b.id, name: b.name, color: b.color, jointIds: [...b.jointIds], useOutlineCOM: b.useOutlineCOM, showLinks: b.showLinks };
   }
   for (const [id, o] of Object.entries(outlines)) {
-    data.outlines[id] = { id: o.id, bodyId: o.bodyId, name: o.name, points: o.points.map(p => ({ x: p.x, y: p.y })) };
+    data.outlines[id] = { id: o.id, bodyId: o.bodyId, name: o.name, visible: o.visible, points: o.points.map(p => ({ x: p.x, y: p.y })) };
   }
 
   if (images && Object.keys(images).length > 0) {
@@ -108,6 +108,7 @@ export function deserializeMechanism(json: string): {
         color: b.color,
         jointIds: b.jointIds || [],
         useOutlineCOM: b.useOutlineCOM ?? false,
+        showLinks: b.showLinks ?? true,
       };
     }
 
@@ -117,6 +118,7 @@ export function deserializeMechanism(json: string): {
         id: o.id,
         bodyId: o.bodyId,
         name: o.name || `Shape ${Object.keys(outlines).length + 1}`,
+        visible: o.visible ?? true,
         points: o.points.map(p => ({ x: p.x, y: p.y })),
       };
     }

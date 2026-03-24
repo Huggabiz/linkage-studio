@@ -202,23 +202,23 @@ export function drawMechanism(
     linkColors.set(link.id, bestColor);
   }
 
-  // Draw links with body-derived color (skip base-body-only links)
+  // Draw links with body-derived color (skip base-body-only links, respect per-body showLinks)
   if (showLinks) {
     for (const link of Object.values(links)) {
-      // Skip links where both endpoints are only in the base body
       const [idA, idB] = link.jointIds;
-      if (baseJointIds.has(idA) && baseJointIds.has(idB)) {
-        // Check if there's a non-base body that also owns both joints
-        let hasNonBaseBody = false;
-        for (const body of Object.values(bodies)) {
-          if (body.id === baseBodyId) continue;
-          if (body.jointIds.includes(idA) && body.jointIds.includes(idB)) {
-            hasNonBaseBody = true;
-            break;
-          }
+      // Find the owning body for this link (non-base body that owns both endpoints)
+      let owningBody: Body | null = null;
+      for (const body of Object.values(bodies)) {
+        if (body.id === baseBodyId) continue;
+        if (body.jointIds.includes(idA) && body.jointIds.includes(idB)) {
+          owningBody = body;
+          break;
         }
-        if (!hasNonBaseBody) continue;
       }
+      // Skip links where both endpoints are only in the base body
+      if (!owningBody && baseJointIds.has(idA) && baseJointIds.has(idB)) continue;
+      // Skip if the owning body has links hidden
+      if (owningBody && !owningBody.showLinks) continue;
       drawLink(ctx, link, joints, zoom, linkColors.get(link.id) || '#666666');
     }
   }
@@ -248,7 +248,7 @@ export function drawOutlines(
 ) {
   for (const outline of outlineList) {
     const body = bodies[outline.bodyId];
-    if (!body || outline.points.length < 2) continue;
+    if (!body || outline.points.length < 2 || !outline.visible) continue;
 
     const worldPoints = frozenPoints?.get(outline.id)
       ?? (() => {

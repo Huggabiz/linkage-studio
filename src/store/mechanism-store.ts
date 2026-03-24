@@ -19,7 +19,7 @@ interface HistorySnapshot {
 const BASE_BODY_ID = 'base';
 
 function createBaseBody(): Body {
-  return { id: BASE_BODY_ID, name: 'Base', color: BASE_BODY_COLOR, jointIds: [], useOutlineCOM: false };
+  return { id: BASE_BODY_ID, name: 'Base', color: BASE_BODY_COLOR, jointIds: [], useOutlineCOM: false, showLinks: true };
 }
 
 interface MechanismStore {
@@ -53,6 +53,8 @@ interface MechanismStore {
   removeOutline(id: string): void;
   renameOutline(id: string, name: string): void;
   toggleOutlineCOM(bodyId: string): void;
+  toggleBodyShowLinks(bodyId: string): void;
+  toggleOutlineVisible(outlineId: string): void;
 
   addImage(bodyId: string, src: string, naturalWidth: number, naturalHeight: number, position: Vec2): string;
   removeImage(id: string): void;
@@ -472,7 +474,7 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
     const existingNames = new Set(Object.values(get().bodies).map((b) => b.name));
     let num = 1;
     while (existingNames.has(`${name} ${num}`)) num++;
-    const body: Body = { id, name: `${name} ${num}`, color, jointIds: [], useOutlineCOM: false };
+    const body: Body = { id, name: `${name} ${num}`, color, jointIds: [], useOutlineCOM: false, showLinks: true };
     set((s) => ({ bodies: { ...s.bodies, [id]: body } }));
     return id;
   },
@@ -566,7 +568,7 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
     const existingNames = new Set(Object.values(get().outlines).map((o) => o.name));
     let num = 1;
     while (existingNames.has(`Shape ${num}`)) num++;
-    const outline: Outline = { id, bodyId, name: `Shape ${num}`, points: localPoints };
+    const outline: Outline = { id, bodyId, name: `Shape ${num}`, visible: true, points: localPoints };
     set((s) => ({ outlines: { ...s.outlines, [id]: outline } }));
     return id;
   },
@@ -593,6 +595,22 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
       const body = s.bodies[bodyId];
       if (!body) return s;
       return { bodies: { ...s.bodies, [bodyId]: { ...body, useOutlineCOM: !body.useOutlineCOM } } };
+    });
+  },
+
+  toggleBodyShowLinks(bodyId) {
+    set((s) => {
+      const body = s.bodies[bodyId];
+      if (!body) return s;
+      return { bodies: { ...s.bodies, [bodyId]: { ...body, showLinks: !body.showLinks } } };
+    });
+  },
+
+  toggleOutlineVisible(outlineId) {
+    set((s) => {
+      const outline = s.outlines[outlineId];
+      if (!outline) return s;
+      return { outlines: { ...s.outlines, [outlineId]: { ...outline, visible: !outline.visible } } };
     });
   },
 }));
