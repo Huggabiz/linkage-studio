@@ -118,14 +118,6 @@ export function drawHUD(
     ctx.fillText(coordText, 90, canvasHeight - 10);
   }
 
-  // Version + credit (bottom-right, above HUD)
-  ctx.font = '11px monospace';
-  ctx.textBaseline = 'bottom';
-  ctx.textAlign = 'right';
-  ctx.fillStyle = 'rgba(255,255,255,0.55)';
-  const credit = 'Slinker v0.2.0 — VibeCoded by Hugo Wilson — Claude Opus 4.6';
-  ctx.fillText(credit, canvasWidth - 10, canvasHeight - 8);
-  ctx.textAlign = 'left';
 }
 
 function drawArrow(
