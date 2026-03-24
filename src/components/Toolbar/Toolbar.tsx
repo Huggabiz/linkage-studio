@@ -67,9 +67,16 @@ export function Toolbar() {
     }
 
     if (newMode === 'simulate') {
+      // Auto-unlock outlines so reprojection happens before entering sim
+      if (editorState.lockOutlines && editorState.frozenOutlineWorldPoints.size > 0) {
+        useMechanismStore.getState().reprojectOutlinesFromWorld(editorState.frozenOutlineWorldPoints);
+        editorState.setLockOutlines(false);
+      }
+
+      const currentJoints = useMechanismStore.getState().joints;
       const positions: Record<string, Vec2> = {};
-      for (const [id, joint] of Object.entries(joints)) {
-        if (id.startsWith('__temp_')) continue; // skip temp joints
+      for (const [id, joint] of Object.entries(currentJoints)) {
+        if (id.startsWith('__temp_')) continue;
         positions[id] = { ...joint.position };
       }
       setSavedPositions(positions);
