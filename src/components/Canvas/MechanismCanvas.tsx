@@ -7,7 +7,7 @@ import { screenToWorld } from '../../renderer/camera';
 import {
   handleMouseDown, handleMouseMove, handleMouseUp, handleDoubleClick, handleWheel, handleKeyDown,
 } from '../../interaction/tool-manager';
-import { hitTest, hitTestOutlineFilled } from '../../interaction/hit-test';
+import { hitTestAny, hitTestOutlineFilled } from '../../interaction/hit-test';
 import { hitTestImage, hitTestRotateHandle, hitTestScaleHandle } from '../../renderer/draw-images';
 import type { Vec2 } from '../../types';
 
@@ -103,7 +103,12 @@ export function MechanismCanvas() {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  // Prevent Safari/iOS gesture zoom on the canvas
+  // Prevent Safari/iOS gesture zoom on the canvas.
+  // IMPORTANT: Only intercept Safari's proprietary gesture* events.
+  // Do NOT preventDefault on touchstart/touchmove — on newer iOS/Safari,
+  // this can block subsequent pointerdown/pointermove from being dispatched.
+  // The CSS touchAction:'none' on the canvas already prevents all default
+  // touch behaviors (scroll, zoom, pan).
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -111,15 +116,10 @@ export function MechanismCanvas() {
     canvas.addEventListener('gesturestart', preventGesture);
     canvas.addEventListener('gesturechange', preventGesture);
     canvas.addEventListener('gestureend', preventGesture);
-    // Prevent touch-based scrolling/zooming that might bypass touchAction
-    canvas.addEventListener('touchstart', preventGesture, { passive: false });
-    canvas.addEventListener('touchmove', preventGesture, { passive: false });
     return () => {
       canvas.removeEventListener('gesturestart', preventGesture);
       canvas.removeEventListener('gesturechange', preventGesture);
       canvas.removeEventListener('gestureend', preventGesture);
-      canvas.removeEventListener('touchstart', preventGesture);
-      canvas.removeEventListener('touchmove', preventGesture);
     };
   }, []);
 
@@ -179,7 +179,22 @@ export function MechanismCanvas() {
           return;
         }
 
-        // --- TOUCH / PEN ---
+        // --- PEN (Apple Pencil): pass through directly, like mouse ---
+        // Pen has precise intent and can't pinch, so no gesture detection needed.
+        if (e.pointerType === 'pen') {
+          e.preventDefault();
+          canvas.setPointerCapture(e.pointerId);
+          gestureState = 'interact';
+          touchStartPointerId = e.pointerId;
+          // Update cursor world pos for outline ghost/preview
+          const rect = canvas.getBoundingClientRect();
+          const screen = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+          cursorWorldRef.current = screenToWorld(screen, useEditorStore.getState().camera);
+          handleMouseDown(e.nativeEvent as PointerEvent, canvas);
+          return;
+        }
+
+        // --- TOUCH (finger) ---
         e.preventDefault();
         canvas.setPointerCapture(e.pointerId);
         activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -202,8 +217,10 @@ export function MechanismCanvas() {
         const mechanism = useMechanismStore.getState();
         const worldPos = screenToWorld(screenPos, editor.camera);
 
-        // Check if touching a joint, link, filled outline, or image (including handles)
-        let componentHit = hitTest(worldPos, mechanism.joints, mechanism.links, editor.camera.zoom)
+        // Check if touching a joint, link, filled outline, or image (including handles).
+        // Use hitTestAny (non-mutating) so the authoritative hitTest in handleMouseDown
+        // gets a clean state for click-cycling overlapping joints.
+        let componentHit = hitTestAny(worldPos, mechanism.joints, mechanism.links, editor.camera.zoom)
           || hitTestOutlineFilled(worldPos, mechanism.outlines, mechanism.bodies, mechanism.joints, mechanism.baseBodyId);
 
         // Also check images and their handles
@@ -256,7 +273,17 @@ export function MechanismCanvas() {
           return;
         }
 
-        // --- TOUCH / PEN ---
+        // --- PEN: pass through directly (like mouse) ---
+        if (e.pointerType === 'pen') {
+          e.preventDefault();
+          const rect = canvas.getBoundingClientRect();
+          const screen = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+          cursorWorldRef.current = screenToWorld(screen, useEditorStore.getState().camera);
+          handleMouseMove(e.nativeEvent as PointerEvent, canvas);
+          return;
+        }
+
+        // --- TOUCH (finger) ---
         e.preventDefault();
         activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
@@ -306,7 +333,15 @@ export function MechanismCanvas() {
           return;
         }
 
-        // --- TOUCH / PEN ---
+        // --- PEN: pass through directly (like mouse) ---
+        if (e.pointerType === 'pen') {
+          try { canvas.releasePointerCapture(e.pointerId); } catch (_) { /* already released */ }
+          handleMouseUp(e.nativeEvent as PointerEvent);
+          resetGesture();
+          return;
+        }
+
+        // --- TOUCH (finger) ---
         try { canvas.releasePointerCapture(e.pointerId); } catch (_) { /* already released */ }
         activePointers.delete(e.pointerId);
 
