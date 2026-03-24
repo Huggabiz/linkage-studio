@@ -12,8 +12,12 @@ import type { Vec2 } from '../../types';
 // Multi-pointer tracking for pinch-to-zoom (pointer-only, no touch events)
 const activePointers: Map<number, Vec2> = new Map();
 let isPinching = false;
+let wasPinching = false; // cooldown: true until all pointers lift after a pinch
 let lastPinchDist: number | null = null;
 let lastPinchCenter: Vec2 | null = null;
+let pendingDownEvent: { pointerId: number; event: PointerEvent; canvas: HTMLCanvasElement } | null = null;
+let pendingDownTimer: ReturnType<typeof setTimeout> | null = null;
+const PINCH_DETECT_DELAY = 80; // ms to wait for second finger before treating as single-tap
 
 
 export function MechanismCanvas() {
@@ -154,19 +158,44 @@ export function MechanismCanvas() {
         canvas.setPointerCapture(e.pointerId);
         activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
-        // 2+ pointers = start pinch, cancel any active interaction
+        // 2+ pointers = start pinch, cancel any pending single-tap and active interaction
         if (activePointers.size >= 2) {
           isPinching = true;
+          wasPinching = true;
           lastPinchDist = null;
           lastPinchCenter = null;
+          // Cancel any deferred single-pointer down
+          if (pendingDownTimer) { clearTimeout(pendingDownTimer); pendingDownTimer = null; pendingDownEvent = null; }
           handleMouseUp(e.nativeEvent as PointerEvent);
           return;
         }
 
-        // Single pointer = normal interaction (only if not already pinching)
-        if (!isPinching) {
+        // For mouse, fire immediately (no multi-touch possible)
+        if (e.pointerType === 'mouse') {
           handleMouseDown(e.nativeEvent as PointerEvent, canvas);
+          return;
         }
+
+        // For touch/pen: defer to allow second finger for pinch detection
+        // Don't start interaction if we're still cooling down from a pinch
+        if (isPinching || wasPinching) return;
+
+        // In simulate mode, fire immediately for responsive dragging
+        const currentMode = useEditorStore.getState().mode;
+        if (currentMode === 'simulate') {
+          handleMouseDown(e.nativeEvent as PointerEvent, canvas);
+          return;
+        }
+
+        // In create mode, defer to distinguish tap from pinch
+        pendingDownEvent = { pointerId: e.pointerId, event: e.nativeEvent as PointerEvent, canvas };
+        pendingDownTimer = setTimeout(() => {
+          if (pendingDownEvent && !isPinching && !wasPinching) {
+            handleMouseDown(pendingDownEvent.event, pendingDownEvent.canvas);
+          }
+          pendingDownEvent = null;
+          pendingDownTimer = null;
+        }, PINCH_DETECT_DELAY);
       }}
       onDoubleClick={(e) => {
         if (!isPinching) {
@@ -183,7 +212,19 @@ export function MechanismCanvas() {
           return;
         }
 
-        if (isPinching) return;
+        if (isPinching || wasPinching) return;
+
+        // If we have a pending deferred down and finger moved enough, fire it now
+        if (pendingDownEvent && pendingDownEvent.pointerId === e.pointerId) {
+          const dx = e.clientX - pendingDownEvent.event.clientX;
+          const dy = e.clientY - pendingDownEvent.event.clientY;
+          if (dx * dx + dy * dy > 9) { // 3px movement threshold
+            clearTimeout(pendingDownTimer!);
+            handleMouseDown(pendingDownEvent.event, pendingDownEvent.canvas);
+            pendingDownEvent = null;
+            pendingDownTimer = null;
+          }
+        }
 
         const canvas = canvasRef.current!;
         const rect = canvas.getBoundingClientRect();
@@ -196,13 +237,31 @@ export function MechanismCanvas() {
         canvas.releasePointerCapture(e.pointerId);
         activePointers.delete(e.pointerId);
 
+        // Cancel deferred down if this pointer is lifting before it fired
+        if (pendingDownEvent && pendingDownEvent.pointerId === e.pointerId) {
+          clearTimeout(pendingDownTimer!);
+          // Fire as a tap if it wasn't a pinch
+          if (!isPinching && !wasPinching) {
+            handleMouseDown(pendingDownEvent.event, pendingDownEvent.canvas);
+            handleMouseUp(e.nativeEvent as PointerEvent);
+          }
+          pendingDownEvent = null;
+          pendingDownTimer = null;
+          return;
+        }
+
         if (activePointers.size < 2) {
           isPinching = false;
           lastPinchDist = null;
           lastPinchCenter = null;
         }
 
-        if (!isPinching) {
+        // Clear pinch cooldown only when ALL pointers are gone
+        if (activePointers.size === 0) {
+          wasPinching = false;
+        }
+
+        if (!isPinching && !wasPinching) {
           handleMouseUp(e.nativeEvent as PointerEvent);
         }
       }}
@@ -217,13 +276,21 @@ export function MechanismCanvas() {
         canvas.releasePointerCapture(e.pointerId);
         activePointers.delete(e.pointerId);
 
+        // Cancel any deferred down
+        if (pendingDownTimer) { clearTimeout(pendingDownTimer); pendingDownTimer = null; pendingDownEvent = null; }
+
         if (activePointers.size < 2) {
           isPinching = false;
           lastPinchDist = null;
           lastPinchCenter = null;
         }
+        if (activePointers.size === 0) {
+          wasPinching = false;
+        }
 
-        handleMouseUp(e.nativeEvent as PointerEvent);
+        if (!isPinching && !wasPinching) {
+          handleMouseUp(e.nativeEvent as PointerEvent);
+        }
       }}
       onWheel={(e) => handleWheel(e.nativeEvent, canvasRef.current!)}
       onContextMenu={(e) => e.preventDefault()}
