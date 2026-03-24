@@ -32,6 +32,10 @@ export function SimulationPanel() {
   const links = useMechanismStore((s) => s.links);
   const selectedIds = useEditorStore((s) => s.selectedIds);
 
+  const showLinks = useEditorStore((s) => s.showLinks);
+  const showVectors = useEditorStore((s) => s.showVectors);
+  const lockOutlines = useEditorStore((s) => s.lockOutlines);
+
   // Physics controls - visible in both modes
   const physicsSection = (
     <>
@@ -103,7 +107,7 @@ export function SimulationPanel() {
       <label style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
         <input
           type="checkbox"
-          checked={useEditorStore((s) => s.showLinks)}
+          checked={showLinks}
           onChange={() => useEditorStore.getState().toggleShowLinks()}
         />
         Show links
@@ -111,7 +115,7 @@ export function SimulationPanel() {
       <label style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
         <input
           type="checkbox"
-          checked={useEditorStore((s) => s.showVectors)}
+          checked={showVectors}
           onChange={() => useEditorStore.getState().toggleShowVectors()}
         />
         Show vectors
@@ -120,7 +124,7 @@ export function SimulationPanel() {
         <label style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
           <input
             type="checkbox"
-            checked={useEditorStore((s) => s.lockOutlines)}
+            checked={lockOutlines}
             onChange={() => {
               const editor = useEditorStore.getState();
               const mech = useMechanismStore.getState();
