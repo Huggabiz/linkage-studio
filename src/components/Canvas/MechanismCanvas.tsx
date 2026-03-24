@@ -64,6 +64,8 @@ export function MechanismCanvas() {
       })(),
       gravityEnabled: sim.gravityEnabled,
       gravityStrength: sim.gravityStrength,
+      baseBodyId: mechanism.baseBodyId,
+      lockOutlines: editor.lockOutlines,
     });
 
     rafRef.current = requestAnimationFrame(renderLoop);

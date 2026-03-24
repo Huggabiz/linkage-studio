@@ -22,6 +22,7 @@ interface EditorStore {
   jointMode: JointMode;
   autoChainLastBodyId: string | null;
   outlinePoints: Vec2[];
+  lockOutlines: boolean;
 
   setMode(mode: AppMode): void;
   setTool(tool: ToolType): void;
@@ -45,6 +46,7 @@ interface EditorStore {
   setAutoChainLastBodyId(id: string | null): void;
   addOutlinePoint(pt: Vec2): void;
   clearOutlinePoints(): void;
+  toggleLockOutlines(): void;
 }
 
 export const useEditorStore = create<EditorStore>((set) => ({
@@ -66,6 +68,7 @@ export const useEditorStore = create<EditorStore>((set) => ({
   jointMode: 'manual' as JointMode,
   autoChainLastBodyId: null as string | null,
   outlinePoints: [] as Vec2[],
+  lockOutlines: false,
 
   setMode(mode) {
     set({ mode, simDrag: null, linkStartJointId: null, selectedIds: new Set(), outlinePoints: [], createTool: 'joints' as CreateTool, jointMode: 'manual' as JointMode, autoChainLastBodyId: null });
@@ -180,5 +183,9 @@ export const useEditorStore = create<EditorStore>((set) => ({
 
   clearOutlinePoints() {
     set({ outlinePoints: [] });
+  },
+
+  toggleLockOutlines() {
+    set((s) => ({ lockOutlines: !s.lockOutlines }));
   },
 }));

@@ -29,6 +29,8 @@ export interface RenderState {
   activeBodyColor: string;
   gravityEnabled: boolean;
   gravityStrength: number;
+  baseBodyId: string;
+  lockOutlines: boolean;
 }
 
 export function render(
@@ -46,7 +48,7 @@ export function render(
     drawGrid(ctx, state.camera, w, h, state.gridSize);
   }
 
-  drawMechanism(ctx, state.joints, state.links, state.bodies, state.outlines, state.selectedIds, state.hoveredId, state.camera.zoom, state.showLinks);
+  drawMechanism(ctx, state.joints, state.links, state.bodies, state.outlines, state.selectedIds, state.hoveredId, state.camera.zoom, state.showLinks, state.baseBodyId, state.lockOutlines);
 
   drawPathTraces(ctx, state.pathTraces, state.camera.zoom);
 

@@ -92,6 +92,10 @@ export function drawJoint(
   }
 }
 
+// Cache of frozen world-space outline points when lockOutlines is enabled
+const frozenOutlinePoints = new Map<string, Vec2[]>();
+let wasLocked = false;
+
 export function drawMechanism(
   ctx: CanvasRenderingContext2D,
   joints: Record<string, Joint>,
@@ -102,6 +106,8 @@ export function drawMechanism(
   hoveredId: string | null,
   zoom: number,
   showLinks: boolean = true,
+  baseBodyId?: string,
+  lockOutlines: boolean = false,
 ) {
   // Build body membership map for joints
   const jointBodies = new Map<string, Body[]>();
@@ -112,6 +118,11 @@ export function drawMechanism(
       jointBodies.set(jid, arr);
     }
   }
+
+  // Base body joint set for filtering base-only links
+  const baseJointIds = baseBodyId && bodies[baseBodyId]
+    ? new Set(bodies[baseBodyId].jointIds)
+    : new Set<string>();
 
   // Build link-to-body color map: find the body that owns both endpoints
   const linkColors = new Map<string, string>();
@@ -127,15 +138,44 @@ export function drawMechanism(
     linkColors.set(link.id, bestColor);
   }
 
-  // Draw links with body-derived color
+  // Draw links with body-derived color (skip base-body-only links)
   if (showLinks) {
     for (const link of Object.values(links)) {
+      // Skip links where both endpoints are only in the base body
+      const [idA, idB] = link.jointIds;
+      if (baseJointIds.has(idA) && baseJointIds.has(idB)) {
+        // Check if there's a non-base body that also owns both joints
+        let hasNonBaseBody = false;
+        for (const body of Object.values(bodies)) {
+          if (body.id === baseBodyId) continue;
+          if (body.jointIds.includes(idA) && body.jointIds.includes(idB)) {
+            hasNonBaseBody = true;
+            break;
+          }
+        }
+        if (!hasNonBaseBody) continue;
+      }
       drawLink(ctx, link, joints, zoom, linkColors.get(link.id) || '#666666');
     }
   }
 
+  // Manage frozen outline cache for lock mode
+  if (lockOutlines && !wasLocked) {
+    // Just locked: snapshot current world-space points
+    frozenOutlinePoints.clear();
+    for (const outline of Object.values(outlines)) {
+      const body = bodies[outline.bodyId];
+      if (!body || outline.points.length < 2) continue;
+      const transform = computeBodyTransform(body, joints);
+      frozenOutlinePoints.set(outline.id, outline.points.map((p) => localToWorld(p, transform)));
+    }
+  } else if (!lockOutlines && wasLocked) {
+    frozenOutlinePoints.clear();
+  }
+  wasLocked = lockOutlines;
+
   // Draw outlines
-  drawOutlines(ctx, Object.values(outlines), bodies, joints, zoom, selectedIds);
+  drawOutlines(ctx, Object.values(outlines), bodies, joints, zoom, selectedIds, lockOutlines ? frozenOutlinePoints : undefined);
 
   // Draw joints with body rings
   for (const joint of Object.values(joints)) {
@@ -152,13 +192,17 @@ export function drawOutlines(
   joints: Record<string, Joint>,
   zoom: number,
   selectedIds: Set<string>,
+  frozenPoints?: Map<string, Vec2[]>,
 ) {
   for (const outline of outlineList) {
     const body = bodies[outline.bodyId];
     if (!body || outline.points.length < 2) continue;
 
-    const transform = computeBodyTransform(body, joints);
-    const worldPoints = outline.points.map((p) => localToWorld(p, transform));
+    const worldPoints = frozenPoints?.get(outline.id)
+      ?? (() => {
+        const transform = computeBodyTransform(body, joints);
+        return outline.points.map((p) => localToWorld(p, transform));
+      })();
     const isSelected = selectedIds.has(outline.id);
 
     ctx.beginPath();

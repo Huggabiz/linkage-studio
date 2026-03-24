@@ -115,6 +115,16 @@ export function SimulationPanel() {
         />
         Show vectors
       </label>
+      {mode === 'create' && (
+        <label style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <input
+            type="checkbox"
+            checked={useEditorStore((s) => s.lockOutlines)}
+            onChange={() => useEditorStore.getState().toggleLockOutlines()}
+          />
+          Lock outlines
+        </label>
+      )}
     </>
   );
 
