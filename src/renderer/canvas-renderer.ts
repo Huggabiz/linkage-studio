@@ -30,7 +30,7 @@ export interface RenderState {
   gravityEnabled: boolean;
   gravityStrength: number;
   baseBodyId: string;
-  lockOutlines: boolean;
+  frozenOutlinePoints?: Map<string, Vec2[]>;
 }
 
 export function render(
@@ -48,7 +48,7 @@ export function render(
     drawGrid(ctx, state.camera, w, h, state.gridSize);
   }
 
-  drawMechanism(ctx, state.joints, state.links, state.bodies, state.outlines, state.selectedIds, state.hoveredId, state.camera.zoom, state.showLinks, state.baseBodyId, state.lockOutlines);
+  drawMechanism(ctx, state.joints, state.links, state.bodies, state.outlines, state.selectedIds, state.hoveredId, state.camera.zoom, state.showLinks, state.baseBodyId, state.frozenOutlinePoints);
 
   drawPathTraces(ctx, state.pathTraces, state.camera.zoom);
 

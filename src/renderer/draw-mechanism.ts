@@ -92,10 +92,6 @@ export function drawJoint(
   }
 }
 
-// Cache of frozen world-space outline points when lockOutlines is enabled
-const frozenOutlinePoints = new Map<string, Vec2[]>();
-let wasLocked = false;
-
 export function drawMechanism(
   ctx: CanvasRenderingContext2D,
   joints: Record<string, Joint>,
@@ -107,7 +103,7 @@ export function drawMechanism(
   zoom: number,
   showLinks: boolean = true,
   baseBodyId?: string,
-  lockOutlines: boolean = false,
+  frozenOutlinePoints?: Map<string, Vec2[]>,
 ) {
   // Build body membership map for joints
   const jointBodies = new Map<string, Body[]>();
@@ -159,23 +155,8 @@ export function drawMechanism(
     }
   }
 
-  // Manage frozen outline cache for lock mode
-  if (lockOutlines && !wasLocked) {
-    // Just locked: snapshot current world-space points
-    frozenOutlinePoints.clear();
-    for (const outline of Object.values(outlines)) {
-      const body = bodies[outline.bodyId];
-      if (!body || outline.points.length < 2) continue;
-      const transform = computeBodyTransform(body, joints);
-      frozenOutlinePoints.set(outline.id, outline.points.map((p) => localToWorld(p, transform)));
-    }
-  } else if (!lockOutlines && wasLocked) {
-    frozenOutlinePoints.clear();
-  }
-  wasLocked = lockOutlines;
-
-  // Draw outlines
-  drawOutlines(ctx, Object.values(outlines), bodies, joints, zoom, selectedIds, lockOutlines ? frozenOutlinePoints : undefined);
+  // Draw outlines (use frozen points if outlines are locked)
+  drawOutlines(ctx, Object.values(outlines), bodies, joints, zoom, selectedIds, frozenOutlinePoints);
 
   // Draw joints with body rings
   for (const joint of Object.values(joints)) {

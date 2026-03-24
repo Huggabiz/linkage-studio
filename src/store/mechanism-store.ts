@@ -51,6 +51,7 @@ interface MechanismStore {
 
   addTempJoint(position: Vec2, bodyId: string): string;
   removeTempJoint(id: string): void;
+  reprojectOutlinesFromWorld(frozenWorldPoints: Map<string, Vec2[]>): void;
 
   clearAll(): void;
   loadState(state: { joints: Record<string, Joint>; links: Record<string, Link>; bodies: Record<string, Body>; baseBodyId: string; outlines: Record<string, Outline> }): void;
@@ -98,6 +99,22 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
     const newLinks = buildLinksRecord(generateBodyLinks(newBodies, newJoints));
     updateJointConnections(newJoints, newLinks);
     set({ joints: newJoints, links: newLinks, bodies: newBodies });
+  },
+
+  reprojectOutlinesFromWorld(frozenWorldPoints) {
+    get().pushHistory();
+    const { outlines, bodies, joints } = get();
+    const newOutlines = { ...outlines };
+    for (const [outlineId, worldPts] of frozenWorldPoints) {
+      const outline = newOutlines[outlineId];
+      if (!outline) continue;
+      const body = bodies[outline.bodyId];
+      if (!body) continue;
+      const transform = computeBodyTransform(body, joints);
+      const newLocalPts = worldPts.map((p) => worldToLocal(p, transform));
+      newOutlines[outlineId] = { ...outline, points: newLocalPts };
+    }
+    set({ outlines: newOutlines });
   },
 
   clearAll() {

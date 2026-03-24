@@ -65,7 +65,7 @@ export function MechanismCanvas() {
       gravityEnabled: sim.gravityEnabled,
       gravityStrength: sim.gravityStrength,
       baseBodyId: mechanism.baseBodyId,
-      lockOutlines: editor.lockOutlines,
+      frozenOutlinePoints: editor.lockOutlines ? editor.frozenOutlineWorldPoints : undefined,
     });
 
     rafRef.current = requestAnimationFrame(renderLoop);
