@@ -418,8 +418,8 @@ export function solveWithForce(
     const posBx = idxB !== undefined ? q[idxB] : jB.position.x;
     const posBy = idxB !== undefined ? q[idxB + 1] : jB.position.y;
 
-    if (gravity.enabled) {
-      // Compute effective COM based on gravity weights
+    if (gravity.enabled && (idxA !== undefined || idxB !== undefined)) {
+      // Skip gravity vectors for base-body-only links (both joints fixed)
       const wA = jointGravityWeights?.get(jA.id) ?? 1;
       const wB = jointGravityWeights?.get(jB.id) ?? 1;
       const totalW = wA + wB;
