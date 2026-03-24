@@ -240,10 +240,56 @@ export function handleMouseDown(e: PointerEvent, canvas: HTMLCanvasElement) {
 
   // --- SLIDER TOOL ---
   if (editor.createTool === 'slider') {
+    // Check for existing joint hit first (select it)
+    const existingJoint = hitTestJoint(worldPos, mechanism.joints, editor.camera.zoom);
+    if (existingJoint && !editor.sliderPointA) {
+      editor.select(existingJoint.id);
+      isDragging = true;
+      dragJointId = existingJoint.id;
+      mechanism.pushHistory();
+      return;
+    }
+
+    // Check for slider rail line hit (select the slider)
+    if (!editor.sliderPointA) {
+      for (const slider of Object.values(mechanism.sliders)) {
+        const jA = mechanism.joints[slider.jointIdA];
+        const jC = mechanism.joints[slider.jointIdC];
+        if (!jA || !jC) continue;
+        const ab = sub(jC.position, jA.position);
+        const ap = sub(worldPos, jA.position);
+        const abLenSq = lengthSq(ab);
+        if (abLenSq < 1e-8) continue;
+        const t = Math.max(0, Math.min(1, dot(ap, ab) / abLenSq));
+        const closest = { x: jA.position.x + ab.x * t, y: jA.position.y + ab.y * t };
+        const dist = distance(worldPos, closest);
+        if (dist < HIT_RADIUS / editor.camera.zoom) {
+          editor.select(slider.id);
+          // Also allow dragging the rail
+          sliderLineDragId = slider.id;
+          sliderLineDragStart = worldPos;
+          const jB = mechanism.joints[slider.jointIdB];
+          sliderLineDragStartPositions = {
+            a: { ...jA.position },
+            b: jB ? { ...jB.position } : { x: 0, y: 0 },
+            c: { ...jC.position },
+          };
+          mechanism.pushHistory();
+          return;
+        }
+      }
+
+      // Clicked empty space with something selected — deselect
+      if (editor.selectedIds.size > 0) {
+        editor.clearSelection();
+        return;
+      }
+    }
+
     const pos = editor.gridEnabled ? snapToGrid(worldPos, editor.gridSize) : worldPos;
 
     if (!editor.sliderPointA) {
-      // First click: place joint A
+      // First click on empty space: place joint A
       const activeBodyIds = Array.from(editor.activeBodyIds);
       const jointId = mechanism.addJoint('revolute', pos, activeBodyIds);
       editor.setSliderPointA({ position: pos, jointId });

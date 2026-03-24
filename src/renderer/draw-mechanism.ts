@@ -92,23 +92,25 @@ export function drawJoint(
   }
 }
 
-/** Draw slider rail lines (grey lines between A and C). */
+/** Draw slider rail lines (grey lines between A and C, blue when selected). */
 export function drawSliderRails(
   ctx: CanvasRenderingContext2D,
   sliders: Record<string, SliderConstraint>,
   joints: Record<string, Joint>,
   zoom: number,
+  selectedIds: Set<string>,
 ) {
   const SLIDER_COLOR = '#777';
   for (const slider of Object.values(sliders)) {
     const jA = joints[slider.jointIdA];
     const jC = joints[slider.jointIdC];
     if (!jA || !jC) continue;
+    const isSelected = selectedIds.has(slider.id);
     ctx.beginPath();
     ctx.moveTo(jA.position.x, jA.position.y);
     ctx.lineTo(jC.position.x, jC.position.y);
-    ctx.strokeStyle = SLIDER_COLOR;
-    ctx.lineWidth = 3 / zoom;
+    ctx.strokeStyle = isSelected ? SELECTION_COLOR : SLIDER_COLOR;
+    ctx.lineWidth = (isSelected ? 4 : 3) / zoom;
     ctx.lineCap = 'round';
     ctx.setLineDash([8 / zoom, 4 / zoom]);
     ctx.stroke();
@@ -221,7 +223,7 @@ export function drawMechanism(
   }
 
   // Draw slider rails
-  drawSliderRails(ctx, sliders, joints, zoom);
+  drawSliderRails(ctx, sliders, joints, zoom, selectedIds);
 
   // Draw outlines (use frozen points if outlines are locked)
   drawOutlines(ctx, Object.values(outlines), bodies, joints, zoom, selectedIds, frozenOutlinePoints);
