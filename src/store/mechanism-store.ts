@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Joint, Link, Body, Outline, CanvasImage, SliderConstraint, JointType } from '../types';
+import type { Joint, Link, Body, Outline, CanvasImage, SliderConstraint, AngleConstraint, JointType } from '../types';
 import type { Vec2 } from '../types';
 import { createId } from '../utils/id';
 import { generateBodyLinks } from '../core/body-links';
@@ -30,6 +30,7 @@ interface MechanismStore {
   outlines: Record<string, Outline>;
   images: Record<string, CanvasImage>;
   sliders: Record<string, SliderConstraint>;
+  angleConstraints: AngleConstraint[];
 
   past: HistorySnapshot[];
   future: HistorySnapshot[];
@@ -87,6 +88,7 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
   outlines: {},
   images: {},
   sliders: {},
+  angleConstraints: [],
   past: [],
   future: [],
 
@@ -126,10 +128,10 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
     const newSliders = { ...get().sliders, [id]: slider };
     // Regenerate links to include A-C distance constraint
     const { bodies, joints } = get();
-    const newLinks = buildLinksRecord(generateBodyLinks(bodies, joints, newSliders));
+    const { newLinks, angleConstraints } = regenConstraints(bodies, joints, newSliders);
     const newJoints = { ...joints };
     updateJointConnections(newJoints, newLinks);
-    set({ sliders: newSliders, links: newLinks, joints: newJoints });
+    set({ sliders: newSliders, links: newLinks, joints: newJoints, angleConstraints });
     return id;
   },
 
@@ -251,12 +253,16 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
       outlines: {},
       images: {},
       sliders: {},
+      angleConstraints: [],
       past: [],
       future: [],
     });
   },
 
   loadState(state) {
+    // Regenerate angle constraints from loaded body/joint structure
+    const sliders = state.sliders || {};
+    const { angleConstraints: ac } = generateBodyLinks(state.bodies, state.joints, sliders);
     set({
       joints: state.joints,
       links: state.links,
@@ -264,7 +270,8 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
       baseBodyId: state.baseBodyId,
       outlines: state.outlines,
       images: state.images || {},
-      sliders: state.sliders || {},
+      sliders,
+      angleConstraints: ac,
       past: [],
       future: [],
     });
@@ -341,10 +348,10 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
     }
 
     // Regenerate links
-    const newLinks = buildLinksRecord(generateBodyLinks(newBodies, newJoints, get().sliders));
+    const { newLinks, angleConstraints: newAngle } = regenConstraints(newBodies, newJoints, get().sliders);
     updateJointConnections(newJoints, newLinks);
 
-    set({ joints: newJoints, links: newLinks, bodies: newBodies, outlines: newOutlines });
+    set({ joints: newJoints, links: newLinks, bodies: newBodies, outlines: newOutlines, angleConstraints: newAngle });
     return id;
   },
 
@@ -389,10 +396,10 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
     }
 
     // Regenerate links
-    const newLinks = buildLinksRecord(generateBodyLinks(newBodies, newJoints, get().sliders));
+    const { newLinks, angleConstraints: newAngle } = regenConstraints(newBodies, newJoints, get().sliders);
     updateJointConnections(newJoints, newLinks);
 
-    set({ joints: newJoints, links: newLinks, bodies: newBodies, outlines: newOutlines, sliders: newSliders });
+    set({ joints: newJoints, links: newLinks, bodies: newBodies, outlines: newOutlines, sliders: newSliders, angleConstraints: newAngle });
   },
 
   moveJoint(id, position) {
@@ -490,7 +497,7 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
 
     // Regenerate links and update joint types
     const newJoints = { ...get().joints };
-    const newLinks = buildLinksRecord(generateBodyLinks(newBodies, newJoints, get().sliders));
+    const { newLinks, angleConstraints: newAngle } = regenConstraints(newBodies, newJoints, get().sliders);
     syncJointTypes(newJoints, newBodies, get().baseBodyId);
     updateJointConnections(newJoints, newLinks);
 
@@ -500,7 +507,7 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
       if (outline.bodyId === id) delete newOutlines[oid];
     }
 
-    set({ bodies: newBodies, joints: newJoints, links: newLinks, outlines: newOutlines });
+    set({ bodies: newBodies, joints: newJoints, links: newLinks, outlines: newOutlines, angleConstraints: newAngle });
   },
 
   renameBody(id, name) {
@@ -531,10 +538,10 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
     const newOutlines = { ...get().outlines };
     reprojectOutlines(newOutlines, bodyId, oldBodies[bodyId], newBodies[bodyId], get().joints, newJoints);
     syncJointTypes(newJoints, newBodies, get().baseBodyId);
-    const newLinks = buildLinksRecord(generateBodyLinks(newBodies, newJoints, get().sliders));
+    const { newLinks, angleConstraints: newAngle } = regenConstraints(newBodies, newJoints, get().sliders);
     updateJointConnections(newJoints, newLinks);
 
-    set({ bodies: newBodies, joints: newJoints, links: newLinks, outlines: newOutlines });
+    set({ bodies: newBodies, joints: newJoints, links: newLinks, outlines: newOutlines, angleConstraints: newAngle });
   },
 
   removeJointFromBody(jointId, bodyId) {
@@ -549,19 +556,19 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
     const newOutlines = { ...get().outlines };
     reprojectOutlines(newOutlines, bodyId, oldBodies[bodyId], newBodies[bodyId], get().joints, newJoints);
     syncJointTypes(newJoints, newBodies, get().baseBodyId);
-    const newLinks = buildLinksRecord(generateBodyLinks(newBodies, newJoints, get().sliders));
+    const { newLinks, angleConstraints: newAngle } = regenConstraints(newBodies, newJoints, get().sliders);
     updateJointConnections(newJoints, newLinks);
 
-    set({ bodies: newBodies, joints: newJoints, links: newLinks, outlines: newOutlines });
+    set({ bodies: newBodies, joints: newJoints, links: newLinks, outlines: newOutlines, angleConstraints: newAngle });
   },
 
   regenerateLinks() {
     const { bodies, joints, baseBodyId } = get();
     const newJoints = { ...joints };
     syncJointTypes(newJoints, bodies, baseBodyId);
-    const newLinks = buildLinksRecord(generateBodyLinks(bodies, newJoints, get().sliders));
+    const { newLinks, angleConstraints } = regenConstraints(bodies, newJoints, get().sliders);
     updateJointConnections(newJoints, newLinks);
-    set({ joints: newJoints, links: newLinks });
+    set({ joints: newJoints, links: newLinks, angleConstraints });
   },
 
   addOutline(bodyId, localPoints) {
@@ -653,6 +660,12 @@ function buildLinksRecord(links: Link[]): Record<string, Link> {
   const record: Record<string, Link> = {};
   for (const link of links) record[link.id] = link;
   return record;
+}
+
+/** Generate links + angle constraints from body structure. */
+function regenConstraints(bodies: Record<string, Body>, joints: Record<string, Joint>, sliders: Record<string, SliderConstraint>) {
+  const { links, angleConstraints } = generateBodyLinks(bodies, joints, sliders);
+  return { newLinks: buildLinksRecord(links), angleConstraints };
 }
 
 function updateJointConnections(joints: Record<string, Joint>, links: Record<string, Link>) {
