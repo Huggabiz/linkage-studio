@@ -155,32 +155,70 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
     const id = '__temp_' + createId();
     const joint: Joint = { id, type: 'revolute', position, connectedLinkIds: [] };
     const newJoints = { ...get().joints, [id]: joint };
-    const newBodies = { ...get().bodies };
-    const body = newBodies[bodyId];
-    if (body) {
-      newBodies[bodyId] = { ...body, jointIds: [...body.jointIds, id] };
+    const { bodies, links } = get();
+    const body = bodies[bodyId];
+    if (!body) {
+      set({ joints: newJoints });
+      return id;
     }
-    // Regenerate links so the temp joint is constrained to the body
-    const newLinks = buildLinksRecord(generateBodyLinks(newBodies, newJoints, get().sliders));
-    updateJointConnections(newJoints, newLinks);
-    set({ joints: newJoints, links: newLinks, bodies: newBodies });
+
+    // DON'T add temp joint to body or regenerate body links.
+    // Instead, manually create links from temp joint to 2 nearest body joints.
+    // This transfers force without changing the body's rigid structure.
+    const bodyJoints = body.jointIds
+      .map((jid) => newJoints[jid])
+      .filter((j): j is Joint => !!j)
+      .map((j) => {
+        const dx = j.position.x - position.x;
+        const dy = j.position.y - position.y;
+        return { id: j.id, dist: Math.sqrt(dx * dx + dy * dy) };
+      })
+      .sort((a, b) => a.dist - b.dist);
+
+    const newLinks = { ...links };
+    const targets = bodyJoints.slice(0, Math.min(2, bodyJoints.length));
+    for (const target of targets) {
+      const linkId = `__templink_${id}_${target.id}`;
+      newLinks[linkId] = {
+        id: linkId,
+        jointIds: [id, target.id],
+        restLength: target.dist,
+        mass: 1,
+      };
+      newJoints[id] = { ...newJoints[id], connectedLinkIds: [...newJoints[id].connectedLinkIds, linkId] };
+      if (newJoints[target.id]) {
+        newJoints[target.id] = { ...newJoints[target.id], connectedLinkIds: [...newJoints[target.id].connectedLinkIds, linkId] };
+      }
+    }
+
+    set({ joints: newJoints, links: newLinks });
     return id;
   },
 
   removeTempJoint(id) {
     const newJoints = { ...get().joints };
-    const newBodies = { ...get().bodies };
-    // Remove from all bodies
-    for (const bodyId of Object.keys(newBodies)) {
-      const body = newBodies[bodyId];
-      if (body.jointIds.includes(id)) {
-        newBodies[bodyId] = { ...body, jointIds: body.jointIds.filter((jid) => jid !== id) };
+    const newLinks = { ...get().links };
+
+    // Remove temp links connected to this joint
+    for (const linkId of Object.keys(newLinks)) {
+      if (linkId.startsWith('__templink_')) {
+        const link = newLinks[linkId];
+        if (link.jointIds.includes(id)) {
+          // Clean up connectedLinkIds on the other joint
+          const otherId = link.jointIds[0] === id ? link.jointIds[1] : link.jointIds[0];
+          if (newJoints[otherId]) {
+            newJoints[otherId] = {
+              ...newJoints[otherId],
+              connectedLinkIds: newJoints[otherId].connectedLinkIds.filter((lid) => lid !== linkId),
+            };
+          }
+          delete newLinks[linkId];
+        }
       }
     }
+
     delete newJoints[id];
-    const newLinks = buildLinksRecord(generateBodyLinks(newBodies, newJoints, get().sliders));
-    updateJointConnections(newJoints, newLinks);
-    set({ joints: newJoints, links: newLinks, bodies: newBodies });
+    set({ joints: newJoints, links: newLinks });
   },
 
   reprojectOutlinesFromWorld(frozenWorldPoints) {
