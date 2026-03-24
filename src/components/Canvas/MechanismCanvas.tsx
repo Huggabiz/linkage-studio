@@ -7,11 +7,17 @@ import { screenToWorld } from '../../renderer/camera';
 import {
   handleMouseDown, handleMouseMove, handleMouseUp, handleDoubleClick, handleWheel, handleKeyDown,
 } from '../../interaction/tool-manager';
+import { hitTest, hitTestOutlineFilled } from '../../interaction/hit-test';
 import type { Vec2 } from '../../types';
 
 // --- Touch gesture state (module-level, survives re-renders) ---
 const activePointers: Map<number, Vec2> = new Map();
-let gestureState: 'none' | 'pending' | 'pan' | 'pinch' = 'none';
+// none     = idle
+// pending  = finger down on empty space, waiting to see if tap or pan
+// interact = finger down on a component, forwarding to tool-manager (drag joint, sim drag, etc.)
+// pan      = single finger dragging on empty space
+// pinch    = two finger zoom + pan
+let gestureState: 'none' | 'pending' | 'interact' | 'pan' | 'pinch' = 'none';
 let lastPinchDist: number | null = null;
 let lastPinchCenter: Vec2 | null = null;
 let touchStartPos: Vec2 | null = null; // where the first finger landed
@@ -177,7 +183,7 @@ export function MechanismCanvas() {
 
         if (activePointers.size >= 2) {
           // Transition to pinch: cancel any in-progress single-pointer interaction
-          if (gestureState === 'pan' || gestureState === 'pending') {
+          if (gestureState === 'interact') {
             handleMouseUp(e.nativeEvent as PointerEvent);
           }
           gestureState = 'pinch';
@@ -186,11 +192,29 @@ export function MechanismCanvas() {
           return;
         }
 
-        // First finger down: record start, wait to see if it's a tap, pan, or pinch
-        gestureState = 'pending';
-        touchStartPos = { x: e.clientX, y: e.clientY };
-        touchStartPointerId = e.pointerId;
-        lastTouchScreen = { x: e.clientX, y: e.clientY };
+        // First finger down — hit-test to decide: interact with component or pan/tap empty space
+        const rect = canvas.getBoundingClientRect();
+        const screenPos: Vec2 = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+        const editor = useEditorStore.getState();
+        const mechanism = useMechanismStore.getState();
+        const worldPos = screenToWorld(screenPos, editor.camera);
+
+        // Check if touching a joint, link, or filled outline
+        const componentHit = hitTest(worldPos, mechanism.joints, mechanism.links, editor.camera.zoom)
+          || hitTestOutlineFilled(worldPos, mechanism.outlines, mechanism.bodies, mechanism.joints, mechanism.baseBodyId);
+
+        if (componentHit) {
+          // Finger landed on a component → forward to tool-manager immediately for drag interaction
+          gestureState = 'interact';
+          touchStartPointerId = e.pointerId;
+          handleMouseDown(e.nativeEvent as PointerEvent, canvas);
+        } else {
+          // Finger landed on empty space → wait to distinguish tap from pan
+          gestureState = 'pending';
+          touchStartPos = { x: e.clientX, y: e.clientY };
+          touchStartPointerId = e.pointerId;
+          lastTouchScreen = { x: e.clientX, y: e.clientY };
+        }
       }}
       onDoubleClick={(e) => {
         if (gestureState !== 'pinch') {
@@ -218,6 +242,15 @@ export function MechanismCanvas() {
           if (activePointers.size >= 2) {
             handlePinchMove();
           }
+          return;
+        }
+
+        // Interact: forward moves to tool-manager (dragging a joint, sim drag, etc.)
+        if (gestureState === 'interact') {
+          const rect = canvas.getBoundingClientRect();
+          const screen = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+          cursorWorldRef.current = screenToWorld(screen, useEditorStore.getState().camera);
+          handleMouseMove(e.nativeEvent as PointerEvent, canvas);
           return;
         }
 
@@ -267,6 +300,14 @@ export function MechanismCanvas() {
           return;
         }
 
+        // Interact: finger lifted off a component drag → forward mouseUp to tool-manager
+        if (gestureState === 'interact' && e.pointerId === touchStartPointerId) {
+          handleMouseUp(e.nativeEvent as PointerEvent);
+          resetGesture();
+          activePointers.clear();
+          return;
+        }
+
         if (gestureState === 'pending' && touchStartPos && e.pointerId === touchStartPointerId) {
           // Finger lifted without significant movement → TAP
           // Fire down + up at the touch position to trigger the action (place joint, select, etc.)
@@ -294,7 +335,7 @@ export function MechanismCanvas() {
         activePointers.delete(e.pointerId);
 
         if (activePointers.size === 0) {
-          if (gestureState !== 'none') {
+          if (gestureState === 'interact') {
             handleMouseUp(e.nativeEvent as PointerEvent);
           }
           resetGesture();
