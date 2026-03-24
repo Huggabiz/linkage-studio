@@ -17,8 +17,9 @@ export function drawGrid(
   const bottom = (canvasHeight - pan.y) / zoom;
 
   // Adaptive grid: scale grid spacing with zoom
+  // Use gridSize as the base unit; only collapse when too dense on screen
   let step = gridSize;
-  while (step * zoom < 15) step *= 5;
+  while (step * zoom < 8) step *= 2;
 
   const startX = Math.floor(left / step) * step;
   const startY = Math.floor(top / step) * step;
