@@ -38,35 +38,39 @@ export function MechanismCanvas() {
     const editor = useEditorStore.getState();
     const sim = useSimulationStore.getState();
 
-    render(ctx, canvas, {
-      joints: mechanism.joints,
-      links: mechanism.links,
-      bodies: mechanism.bodies,
-      outlines: mechanism.outlines,
-      selectedIds: editor.selectedIds,
-      hoveredId: editor.hoveredId,
-      camera: editor.camera,
-      gridEnabled: editor.gridEnabled,
-      gridSize: editor.gridSize,
-      dof: sim.dof,
-      cursorWorld: cursorWorldRef.current,
-      pathTraces: sim.pathTraces,
-      simDrag: editor.simDrag,
-      mode: editor.mode,
-      forceVectors: sim.solverResult?.forceVectors || [],
-      showLinks: editor.showLinks,
-      showVectors: editor.showVectors,
-      createTool: editor.createTool,
-      outlinePoints: editor.outlinePoints,
-      activeBodyColor: (() => {
-        const activeId = [...editor.activeBodyIds][0];
-        return activeId && mechanism.bodies[activeId] ? mechanism.bodies[activeId].color : '#888888';
-      })(),
-      gravityEnabled: sim.gravityEnabled,
-      gravityStrength: sim.gravityStrength,
-      baseBodyId: mechanism.baseBodyId,
-      frozenOutlinePoints: editor.lockOutlines ? editor.frozenOutlineWorldPoints : undefined,
-    });
+    try {
+      render(ctx, canvas, {
+        joints: mechanism.joints,
+        links: mechanism.links,
+        bodies: mechanism.bodies,
+        outlines: mechanism.outlines,
+        selectedIds: editor.selectedIds,
+        hoveredId: editor.hoveredId,
+        camera: editor.camera,
+        gridEnabled: editor.gridEnabled,
+        gridSize: editor.gridSize,
+        dof: sim.dof,
+        cursorWorld: cursorWorldRef.current,
+        pathTraces: sim.pathTraces,
+        simDrag: editor.simDrag,
+        mode: editor.mode,
+        forceVectors: sim.solverResult?.forceVectors || [],
+        showLinks: editor.showLinks,
+        showVectors: editor.showVectors,
+        createTool: editor.createTool,
+        outlinePoints: editor.outlinePoints,
+        activeBodyColor: (() => {
+          const activeId = [...editor.activeBodyIds][0];
+          return activeId && mechanism.bodies[activeId] ? mechanism.bodies[activeId].color : '#888888';
+        })(),
+        gravityEnabled: sim.gravityEnabled,
+        gravityStrength: sim.gravityStrength,
+        baseBodyId: mechanism.baseBodyId,
+        frozenOutlinePoints: editor.lockOutlines ? editor.frozenOutlineWorldPoints : undefined,
+      });
+    } catch (e) {
+      console.error('Render error:', e);
+    }
 
     rafRef.current = requestAnimationFrame(renderLoop);
   }, []);

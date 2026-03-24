@@ -2,8 +2,6 @@ import { create } from 'zustand';
 import type { AppMode, ToolType, JointSubType, CreateTool, JointMode, CameraState, SimDragState } from '../types';
 import type { Vec2 } from '../types';
 import { DEFAULT_GRID_SIZE } from '../utils/constants';
-import { computeBodyTransform, localToWorld } from '../core/body-transform';
-import { useMechanismStore } from './mechanism-store';
 
 interface EditorStore {
   mode: AppMode;
@@ -49,7 +47,7 @@ interface EditorStore {
   setAutoChainLastBodyId(id: string | null): void;
   addOutlinePoint(pt: Vec2): void;
   clearOutlinePoints(): void;
-  toggleLockOutlines(): void;
+  setLockOutlines(locked: boolean, frozenPoints?: Map<string, Vec2[]>): void;
 }
 
 export const useEditorStore = create<EditorStore>((set) => ({
@@ -75,7 +73,7 @@ export const useEditorStore = create<EditorStore>((set) => ({
   frozenOutlineWorldPoints: new Map(),
 
   setMode(mode) {
-    set({ mode, simDrag: null, linkStartJointId: null, selectedIds: new Set(), outlinePoints: [], createTool: 'joints' as CreateTool, jointMode: 'manual' as JointMode, autoChainLastBodyId: null });
+    set({ mode, simDrag: null, linkStartJointId: null, selectedIds: new Set(), outlinePoints: [], createTool: 'joints' as CreateTool, jointMode: 'manual' as JointMode, autoChainLastBodyId: null, lockOutlines: false, frozenOutlineWorldPoints: new Map() });
   },
 
   setTool(tool) {
@@ -189,25 +187,10 @@ export const useEditorStore = create<EditorStore>((set) => ({
     set({ outlinePoints: [] });
   },
 
-  toggleLockOutlines() {
-    const { lockOutlines } = get();
-    if (!lockOutlines) {
-      // Locking: snapshot current world-space outline positions
-      const mech = useMechanismStore.getState();
-      const frozen = new Map<string, Vec2[]>();
-      for (const outline of Object.values(mech.outlines)) {
-        const body = mech.bodies[outline.bodyId];
-        if (!body || outline.points.length < 2) continue;
-        const transform = computeBodyTransform(body, mech.joints);
-        frozen.set(outline.id, outline.points.map((p) => localToWorld(p, transform)));
-      }
-      set({ lockOutlines: true, frozenOutlineWorldPoints: frozen });
+  setLockOutlines(locked, frozenPoints) {
+    if (locked) {
+      set({ lockOutlines: true, frozenOutlineWorldPoints: frozenPoints || new Map() });
     } else {
-      // Unlocking: reproject outlines so they stay at their frozen positions
-      const { frozenOutlineWorldPoints } = get();
-      if (frozenOutlineWorldPoints.size > 0) {
-        useMechanismStore.getState().reprojectOutlinesFromWorld(frozenOutlineWorldPoints);
-      }
       set({ lockOutlines: false, frozenOutlineWorldPoints: new Map() });
     }
   },

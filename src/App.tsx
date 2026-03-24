@@ -15,6 +15,7 @@ function App() {
 
   useEffect(() => {
     const tick = () => {
+      try {
       const sim = useSimulationStore.getState();
       const mech = useMechanismStore.getState();
       const editor = useEditorStore.getState();
@@ -159,6 +160,9 @@ function App() {
             if (pos) sim.recordTrace(jointId, pos);
           }
         }
+      }
+      } catch (e) {
+        console.error('Simulation tick error:', e);
       }
     };
 
