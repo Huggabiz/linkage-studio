@@ -12,11 +12,13 @@ export function TopBar() {
   const links = useMechanismStore((s) => s.links);
   const bodies = useMechanismStore((s) => s.bodies);
   const outlines = useMechanismStore((s) => s.outlines);
+  const images = useMechanismStore((s) => s.images);
+  const sliders = useMechanismStore((s) => s.sliders);
   const baseBodyId = useMechanismStore((s) => s.baseBodyId);
   const clearSelection = useEditorStore((s) => s.clearSelection);
 
   const handleSave = async () => {
-    const json = serializeMechanism(joints, links, bodies, baseBodyId, outlines);
+    const json = serializeMechanism(joints, links, bodies, baseBodyId, outlines, images, sliders);
     const timestamp = new Date().toISOString().slice(0, 16).replace(/[:-]/g, '');
     await saveFileAs(json, `linkage_${timestamp}.slinker`);
   };
