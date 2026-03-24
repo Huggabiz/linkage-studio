@@ -24,12 +24,14 @@ export interface Body {
   color: string;
   jointIds: string[];
   useOutlineCOM: boolean;
+  showLinks: boolean;
 }
 
 export interface Outline {
   readonly id: string;
   bodyId: string;
   name: string;
+  visible: boolean;
   points: Vec2[];  // local coordinates relative to body reference frame
 }
 
