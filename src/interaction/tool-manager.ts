@@ -96,65 +96,37 @@ export function handleMouseDown(e: PointerEvent, canvas: HTMLCanvasElement) {
     if (outlineHit) {
       const body = mechanism.bodies[outlineHit.bodyId];
       if (body) {
-        // Find the body's link closest to the grab point, and compute parametric t
-        // This makes the drag apply force at the actual grab location on the body
-        const bodyJointSet = new Set(body.jointIds);
-        let bestLink: string | null = null;
-        let bestT = 0.5;
-        let bestDist = Infinity;
-        let bestJointId: string | null = null;
+        // Check body has at least one free joint (otherwise can't drag)
+        const hasFreeJoint = body.jointIds.some((jid) => !isFixed(jid));
+        if (!hasFreeJoint) return;
 
-        for (const link of Object.values(mechanism.links)) {
-          // Only consider links whose both joints are in this body
-          if (!bodyJointSet.has(link.jointIds[0]) || !bodyJointSet.has(link.jointIds[1])) continue;
-          const jA = mechanism.joints[link.jointIds[0]];
-          const jB = mechanism.joints[link.jointIds[1]];
-          if (!jA || !jB) continue;
-          // Skip if both endpoints are fixed
-          if (isFixed(jA.id) && isFixed(jB.id)) continue;
+        // Create a temporary joint at the grab point, attached to this body.
+        // Link regeneration will connect it to the body's other joints via
+        // distance constraints, so force propagates naturally.
+        const tempId = mechanism.addTempJoint(worldPos, body.id);
 
-          // Project worldPos onto this link segment
-          const ab = sub(jB.position, jA.position);
-          const ap = sub(worldPos, jA.position);
-          const abLen = lengthSq(ab);
-          const t = abLen > 1e-8 ? Math.max(0, Math.min(1, dot(ap, ab) / abLen)) : 0.5;
-          const projX = jA.position.x + ab.x * t;
-          const projY = jA.position.y + ab.y * t;
-          const d = Math.sqrt((worldPos.x - projX) ** 2 + (worldPos.y - projY) ** 2);
+        // Re-read mechanism state after temp joint was added
+        const mech2 = useMechanismStore.getState();
+        const tempJoint = mech2.joints[tempId];
+        if (!tempJoint) return;
 
-          if (d < bestDist) {
-            bestDist = d;
-            bestLink = link.id;
-            bestT = t;
-            // Pick the closer non-fixed joint as reference
-            if (isFixed(jA.id)) bestJointId = jB.id;
-            else if (isFixed(jB.id)) bestJointId = jA.id;
-            else bestJointId = t <= 0.5 ? jA.id : jB.id;
-          }
+        // Find a link connected to the temp joint
+        const linkId = tempJoint.connectedLinkIds[0] || null;
+        let grabT = 0;
+        if (linkId) {
+          const link = mech2.links[linkId];
+          if (link) grabT = link.jointIds[0] === tempId ? 0 : 1;
         }
 
-        // Fallback: if no link found, use nearest non-fixed joint directly
-        if (!bestJointId) {
-          let fallbackDist = Infinity;
-          for (const jid of body.jointIds) {
-            if (isFixed(jid)) continue;
-            const j = mechanism.joints[jid];
-            if (!j) continue;
-            const d = distance(worldPos, j.position);
-            if (d < fallbackDist) { fallbackDist = d; bestJointId = jid; }
-          }
-        }
-
-        if (bestJointId) {
-          editor.setSimDrag({
-            active: true,
-            grabPoint: worldPos,
-            cursorPoint: worldPos,
-            jointId: bestJointId,
-            linkId: bestLink,
-            grabT: bestT,
-          });
-        }
+        editor.setSimDrag({
+          active: true,
+          grabPoint: worldPos,
+          cursorPoint: worldPos,
+          jointId: tempId,
+          linkId,
+          grabT,
+          tempJointId: tempId,
+        });
       }
     }
     return;
@@ -328,6 +300,12 @@ export function handleMouseMove(e: PointerEvent, canvas: HTMLCanvasElement) {
 export function handleMouseUp(_e: PointerEvent | MouseEvent) {
   const editor = useEditorStore.getState();
 
+  // Clean up temporary joint from shape dragging
+  if (editor.simDrag?.tempJointId) {
+    const mechanism = useMechanismStore.getState();
+    mechanism.removeTempJoint(editor.simDrag.tempJointId);
+  }
+
   // Clear simulate drag
   if (editor.simDrag) {
     editor.setSimDrag(null);
@@ -359,6 +337,10 @@ export function handleKeyDown(e: KeyboardEvent) {
       return;
     }
     if (e.key === 'Escape') {
+      if (editor.simDrag?.tempJointId) {
+        const mechanism = useMechanismStore.getState();
+        mechanism.removeTempJoint(editor.simDrag.tempJointId);
+      }
       editor.setSimDrag(null);
       return;
     }
