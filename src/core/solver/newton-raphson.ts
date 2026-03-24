@@ -320,7 +320,6 @@ export function solveWithForce(
 
     // 3. Project distance constraints + slider constraints
     const sliderArray = sliders ? Object.values(sliders) : [];
-      const angleArray = angleConstraints || [];
     for (let pass = 0; pass < CONSTRAINT_PASSES; pass++) {
       for (const link of linkArray) {
         const idxI = jointIndex.get(link.jointIds[0]);
@@ -495,82 +494,9 @@ export function solveWithForce(
         }
       }
 
-      // Angle constraints: maintain angle at joint B between A and C.
-      // Uses gradient-based PBD projection. Essential for collinear joints
-      // where distance constraints alone are degenerate.
-      if (angleArray.length > 0) {
-        for (const ac of angleArray) {
-          const idxA = jointIndex.get(ac.jointIdA);
-          const idxB = jointIndex.get(ac.jointIdB);
-          const idxC = jointIndex.get(ac.jointIdC);
-          const jA = joints[ac.jointIdA];
-          const jB = joints[ac.jointIdB];
-          const jC = joints[ac.jointIdC];
-          if (!jA || !jB || !jC) continue;
-
-          const freeA = idxA !== undefined;
-          const freeB = idxB !== undefined;
-          const freeC = idxC !== undefined;
-          if (!freeA && !freeB && !freeC) continue;
-
-          // Current positions
-          const ax2 = freeA ? predicted[idxA!] : jA.position.x;
-          const ay2 = freeA ? predicted[idxA! + 1] : jA.position.y;
-          const bx2 = freeB ? predicted[idxB!] : jB.position.x;
-          const by2 = freeB ? predicted[idxB! + 1] : jB.position.y;
-          const cx3 = freeC ? predicted[idxC!] : jC.position.x;
-          const cy3 = freeC ? predicted[idxC! + 1] : jC.position.y;
-
-          // Vectors from B (vertex) to A and C
-          const d1x = ax2 - bx2, d1y = ay2 - by2; // B→A
-          const d2x = cx3 - bx2, d2y = cy3 - by2; // B→C
-
-          const len1sq = d1x * d1x + d1y * d1y;
-          const len2sq = d2x * d2x + d2y * d2y;
-          if (len1sq < 1e-10 || len2sq < 1e-10) continue;
-
-          // Current angle at B
-          const cross = d1x * d2y - d1y * d2x;
-          const dotAC = d1x * d2x + d1y * d2y;
-          const currentAngle = Math.atan2(cross, dotAC);
-
-          // Angle error
-          let dAngle = currentAngle - ac.restAngle;
-          // Wrap to [-π, π]
-          while (dAngle > Math.PI) dAngle -= 2 * Math.PI;
-          while (dAngle < -Math.PI) dAngle += 2 * Math.PI;
-
-          if (Math.abs(dAngle) < 1e-10) continue;
-
-          // Gradients: ∂θ/∂pA = perp(d1) / |d1|², ∂θ/∂pC = -perp(d2) / |d2|²
-          // perp(d1) = (-d1y, d1x)
-          const gAx = -d1y / len1sq, gAy = d1x / len1sq;
-          const gCx = d2y / len2sq, gCy = -d2x / len2sq;
-          const gBx = -(gAx + gCx), gBy = -(gAy + gCy);
-
-          // Weighted denominator: sum of w_i * |grad_i|²
-          let denom = 0;
-          if (freeA) denom += gAx * gAx + gAy * gAy;
-          if (freeB) denom += gBx * gBx + gBy * gBy;
-          if (freeC) denom += gCx * gCx + gCy * gCy;
-          if (denom < 1e-14) continue;
-
-          const lambda = -dAngle / denom;
-
-          if (freeA) {
-            predicted[idxA!] += lambda * gAx;
-            predicted[idxA! + 1] += lambda * gAy;
-          }
-          if (freeB) {
-            predicted[idxB!] += lambda * gBx;
-            predicted[idxB! + 1] += lambda * gBy;
-          }
-          if (freeC) {
-            predicted[idxC!] += lambda * gCx;
-            predicted[idxC! + 1] += lambda * gCy;
-          }
-        }
-      }
+      // Note: angle constraints were tested but removed — they destabilize
+      // near-collinear configurations by fighting distance constraints.
+      // Full pairwise distance links provide sufficient rigidity.
     }
 
     // 4. Derive velocity from position change
