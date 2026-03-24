@@ -18,6 +18,8 @@ export function TopBar() {
   const sliders = useMechanismStore((s) => s.sliders);
   const baseBodyId = useMechanismStore((s) => s.baseBodyId);
   const clearSelection = useEditorStore((s) => s.clearSelection);
+  const mode = useEditorStore((s) => s.mode);
+  const isCreate = mode === 'create';
 
   const handleSave = async () => {
     const json = serializeMechanism(joints, links, bodies, baseBodyId, outlines, images, sliders);
@@ -37,7 +39,7 @@ export function TopBar() {
   return (
     <div className="top-bar">
       <div className="top-bar-group">
-        <button className="top-bar-btn" onClick={handleSave} title="Save file">
+        <button className="top-bar-btn" onClick={handleSave} title="Save file" disabled={!isCreate}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
             <polyline points="17 21 17 13 7 13 7 21"/>
@@ -45,7 +47,7 @@ export function TopBar() {
           </svg>
           Save
         </button>
-        <button className="top-bar-btn" onClick={handleOpen} title="Open file">
+        <button className="top-bar-btn" onClick={handleOpen} title="Open file" disabled={!isCreate}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
           </svg>

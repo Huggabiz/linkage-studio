@@ -44,6 +44,12 @@
   color: #f66;
 }
 
+.top-bar-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+  pointer-events: none;
+}
+
 .top-bar-btn svg {
   flex-shrink: 0;
 }
