@@ -28,7 +28,8 @@ export function drawLink(
   ctx.beginPath();
   ctx.moveTo(jA.position.x, jA.position.y);
   ctx.lineTo(jB.position.x, jB.position.y);
-  ctx.strokeStyle = color;
+  // Temp links are nearly invisible (black at 5% opacity)
+  ctx.strokeStyle = link.id.startsWith('__templink_') ? 'rgba(0, 0, 0, 0.05)' : color;
   ctx.lineWidth = 4 / zoom;
   ctx.lineCap = 'round';
   ctx.stroke();
