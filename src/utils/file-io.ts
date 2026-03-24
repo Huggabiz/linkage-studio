@@ -1,5 +1,7 @@
 import type { Joint, Link, Body, Outline, CanvasImage, SliderConstraint, Vec2 } from '../types';
 
+declare const __APP_VERSION__: string;
+
 /** Serializable format for a linkage file (.slinker) */
 interface SlinkerFile {
   version: string;
@@ -22,7 +24,7 @@ export function serializeMechanism(
   sliders?: Record<string, SliderConstraint>,
 ): string {
   const data: SlinkerFile = {
-    version: '0.4.0',
+    version: __APP_VERSION__,
     joints: {},
     links: {},
     bodies: {},

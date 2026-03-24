@@ -3,6 +3,8 @@ import { useMechanismStore } from '../../store/mechanism-store';
 import { serializeMechanism, deserializeMechanism, saveFileAs, openFilePicker } from '../../utils/file-io';
 import './TopBar.css';
 
+declare const __APP_VERSION__: string;
+
 export function TopBar() {
   const undo = useMechanismStore((s) => s.undo);
   const redo = useMechanismStore((s) => s.redo);
@@ -85,7 +87,7 @@ export function TopBar() {
       <div className="top-bar-spacer" />
 
       <div className="top-bar-brand">
-        <span>Slinker v0.4.0</span>
+        <span>Slinker v{__APP_VERSION__}</span>
       </div>
     </div>
   );
