@@ -200,6 +200,18 @@ export function Toolbar() {
           <div className="sim-hint">Scroll to zoom</div>
         </div>
       )}
+
+      <div style={{ marginTop: 'auto', padding: '8px', borderTop: '1px solid #333' }}>
+        <div style={{ fontSize: 9, color: '#666', lineHeight: 1.4 }}>
+          Slinker v0.2.0
+        </div>
+        <div style={{ fontSize: 9, color: '#555', lineHeight: 1.4 }}>
+          VibeCoded by Hugo Wilson
+        </div>
+        <div style={{ fontSize: 9, color: '#555', lineHeight: 1.4 }}>
+          Claude Opus 4.6
+        </div>
+      </div>
     </div>
   );
 }
