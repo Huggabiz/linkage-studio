@@ -81,6 +81,8 @@ export function MechanismCanvas() {
         baseBodyId: mechanism.baseBodyId,
         frozenOutlinePoints: editor.lockOutlines ? editor.frozenOutlineWorldPoints : undefined,
         sliderPointA: editor.sliderPointA?.position ?? null,
+        editingOutlineId: editor.editingOutlineId,
+        editingVertexIndex: editor.editingVertexIndex,
       });
     } catch (e) {
       console.error('Render error:', e);
@@ -310,6 +312,10 @@ export function MechanismCanvas() {
 
         if (gestureState === 'pending' && touchStartPos && e.pointerId === touchStartPointerId) {
           // Finger lifted without significant movement → TAP
+          // Update cursor world position so outline ghost draws correctly
+          const rect = canvas.getBoundingClientRect();
+          const screen = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+          cursorWorldRef.current = screenToWorld(screen, useEditorStore.getState().camera);
           // Fire down + up at the touch position to trigger the action (place joint, select, etc.)
           handleMouseDown(e.nativeEvent as PointerEvent, canvas);
           handleMouseUp(e.nativeEvent as PointerEvent);

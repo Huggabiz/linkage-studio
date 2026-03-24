@@ -1,7 +1,7 @@
 import type { Joint, Link, Body, Outline, CanvasImage, SliderConstraint, Vec2, SimDragState, AppMode, ForceVector, CreateTool } from '../types';
 import type { CameraState } from '../types';
 import { applyCamera, resetCamera } from './camera';
-import { drawMechanism, drawOutlineGhost, drawSliderGhost } from './draw-mechanism';
+import { drawMechanism, drawOutlineGhost, drawSliderGhost, drawOutlineEditMode } from './draw-mechanism';
 import { drawImages } from './draw-images';
 import { drawGrid, drawPathTraces, drawForceVectors, drawDragInteraction, drawModeBadge, drawHUD, clearCanvas, drawCOMMarkers } from './draw-overlays';
 import { lerp } from '../core/math/vec2';
@@ -35,6 +35,8 @@ export interface RenderState {
   baseBodyId: string;
   frozenOutlinePoints?: Map<string, Vec2[]>;
   sliderPointA?: Vec2 | null;
+  editingOutlineId?: string | null;
+  editingVertexIndex?: number | null;
 }
 
 export function render(
@@ -55,9 +57,28 @@ export function render(
   // Draw images behind mechanism
   drawImages(ctx, state.images, state.camera.zoom, state.selectedIds);
 
-  drawMechanism(ctx, state.joints, state.links, state.bodies, state.outlines, state.sliders, state.selectedIds, state.hoveredId, state.camera.zoom, state.showLinks, state.baseBodyId, state.frozenOutlinePoints);
+  // When editing an outline, exclude it from frozen points so it renders from live data
+  let frozenPts = state.frozenOutlinePoints;
+  if (state.editingOutlineId && frozenPts && frozenPts.has(state.editingOutlineId)) {
+    frozenPts = new Map(frozenPts);
+    frozenPts.delete(state.editingOutlineId);
+  }
+  drawMechanism(ctx, state.joints, state.links, state.bodies, state.outlines, state.sliders, state.selectedIds, state.hoveredId, state.camera.zoom, state.showLinks, state.baseBodyId, frozenPts);
 
   drawPathTraces(ctx, state.pathTraces, state.camera.zoom);
+
+  // Outline edit mode overlay
+  if (state.mode === 'create' && state.editingOutlineId) {
+    const outline = state.outlines[state.editingOutlineId];
+    if (outline) {
+      const body = state.bodies[outline.bodyId];
+      if (body && outline.points.length >= 2) {
+        const transform = computeBodyTransform(body, state.joints);
+        const worldPts = outline.points.map((p) => localToWorld(p, transform));
+        drawOutlineEditMode(ctx, worldPts, state.camera.zoom, state.editingVertexIndex ?? null);
+      }
+    }
+  }
 
   // Outline ghost (in-progress drawing)
   if (state.mode === 'create' && state.createTool === 'outline' && state.outlinePoints.length > 0) {
