@@ -3,16 +3,6 @@ import { useEditorStore } from '../../store/editor-store';
 import { useMechanismStore } from '../../store/mechanism-store';
 import { BODY_COLORS } from '../../utils/constants';
 
-/** Pencil/edit SVG icon */
-function PencilIcon() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
-      <path d="m15 5 4 4"/>
-    </svg>
-  );
-}
-
 /** Eye open SVG icon */
 function EyeIcon() {
   return (
@@ -188,7 +178,7 @@ export function BodyPanel() {
                 title={isBase ? 'Base body color' : 'Click to change color'}
               />
 
-              {/* Name */}
+              {/* Name (double-click to edit) */}
               {isEditing ? (
                 <input
                   autoFocus
@@ -203,7 +193,10 @@ export function BodyPanel() {
                   }}
                 />
               ) : (
-                <span style={{ flex: 1, fontSize: 12, fontWeight: isBase ? 600 : 400 }}>
+                <span
+                  style={{ flex: 1, fontSize: 12, fontWeight: isBase ? 600 : 400 }}
+                  onDoubleClick={(e) => { e.stopPropagation(); if (!isBase) setEditingId(body.id); }}
+                >
                   {body.name}
                 </span>
               )}
@@ -212,6 +205,21 @@ export function BodyPanel() {
               <span style={{ fontSize: 10, opacity: 0.6 }}>
                 {body.jointIds.length}j
               </span>
+
+              {/* CoA toggle */}
+              {bodyOutlines.length > 0 && (
+                <span
+                  title={body.useOutlineCOM ? 'Using outline center of area for gravity' : 'Using joint centroid for gravity'}
+                  style={{
+                    fontSize: 9, padding: '0 3px', borderRadius: 2, cursor: 'pointer',
+                    backgroundColor: body.useOutlineCOM ? 'rgba(76,175,80,0.3)' : 'rgba(255,255,255,0.05)',
+                    color: body.useOutlineCOM ? '#4CAF50' : 'inherit',
+                  }}
+                  onClick={(e) => { e.stopPropagation(); toggleOutlineCOM(body.id); }}
+                >
+                  CoA
+                </span>
+              )}
 
               {/* Link visibility toggle */}
               {!isBase && body.jointIds.length >= 2 && (
@@ -232,32 +240,7 @@ export function BodyPanel() {
                 </span>
               )}
 
-              {/* CoA toggle */}
-              {bodyOutlines.length > 0 && (
-                <span
-                  title={body.useOutlineCOM ? 'Using outline center of area for gravity' : 'Using joint centroid for gravity'}
-                  style={{
-                    fontSize: 9, padding: '0 3px', borderRadius: 2, cursor: 'pointer',
-                    backgroundColor: body.useOutlineCOM ? 'rgba(76,175,80,0.3)' : 'rgba(255,255,255,0.05)',
-                    color: body.useOutlineCOM ? '#4CAF50' : 'inherit',
-                  }}
-                  onClick={(e) => { e.stopPropagation(); toggleOutlineCOM(body.id); }}
-                >
-                  CoA
-                </span>
-              )}
-
-              {/* Edit (pencil) + Delete */}
-              {!isBase && !isEditing && (
-                <button
-                  className="tool-btn"
-                  style={{ padding: '1px 3px', display: 'flex', alignItems: 'center' }}
-                  onClick={(e) => { e.stopPropagation(); setEditingId(body.id); }}
-                  title="Rename body"
-                >
-                  <PencilIcon />
-                </button>
-              )}
+              {/* Delete */}
               {!isBase && (
                 <button
                   className="tool-btn"
@@ -306,7 +289,7 @@ export function BodyPanel() {
                         <polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5"/>
                       </svg>
 
-                      {/* Name */}
+                      {/* Name (double-click to edit) */}
                       {isOutlineEditing ? (
                         <input
                           autoFocus
@@ -321,24 +304,15 @@ export function BodyPanel() {
                           }}
                         />
                       ) : (
-                        <span style={{ flex: 1, color: '#aaa', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <span
+                          style={{ flex: 1, color: '#aaa', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                          onDoubleClick={(e) => { e.stopPropagation(); setEditingId(outline.id); }}
+                        >
                           {outline.name}
                         </span>
                       )}
 
                       <span style={{ fontSize: 9, opacity: 0.5 }}>{outline.points.length}v</span>
-
-                      {/* Rename */}
-                      {!isOutlineEditing && (
-                        <button
-                          className="tool-btn"
-                          style={{ padding: '0px 2px', display: 'flex', alignItems: 'center' }}
-                          onClick={(e) => { e.stopPropagation(); setEditingId(outline.id); }}
-                          title="Rename shape"
-                        >
-                          <PencilIcon />
-                        </button>
-                      )}
 
                       {/* Delete */}
                       <button
