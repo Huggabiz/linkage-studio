@@ -44,6 +44,7 @@ export function MechanismCanvas() {
         links: mechanism.links,
         bodies: mechanism.bodies,
         outlines: mechanism.outlines,
+        images: mechanism.images,
         selectedIds: editor.selectedIds,
         hoveredId: editor.hoveredId,
         camera: editor.camera,

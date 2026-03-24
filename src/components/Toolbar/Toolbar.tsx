@@ -1,8 +1,8 @@
 import { useEditorStore } from '../../store/editor-store';
 import { useMechanismStore } from '../../store/mechanism-store';
-import type { AppMode, CreateTool, JointMode } from '../../types';
+import type { AppMode } from '../../types';
 import type { Vec2 } from '../../types';
-import { serializeMechanism, deserializeMechanism, downloadFile, openFilePicker } from '../../utils/file-io';
+import { screenToWorld } from '../../renderer/camera';
 import './Toolbar.css';
 
 export function Toolbar() {
@@ -14,52 +14,33 @@ export function Toolbar() {
   const setMode = useEditorStore((s) => s.setMode);
   const setSavedPositions = useEditorStore((s) => s.setSavedPositions);
   const savedPositions = useEditorStore((s) => s.savedPositions);
-  const undo = useMechanismStore((s) => s.undo);
-  const redo = useMechanismStore((s) => s.redo);
-  const clearAll = useMechanismStore((s) => s.clearAll);
-  const loadState = useMechanismStore((s) => s.loadState);
   const removeJoint = useMechanismStore((s) => s.removeJoint);
   const removeOutline = useMechanismStore((s) => s.removeOutline);
+  const removeImage = useMechanismStore((s) => s.removeImage);
   const joints = useMechanismStore((s) => s.joints);
-  const bodies = useMechanismStore((s) => s.bodies);
-  const links = useMechanismStore((s) => s.links);
   const outlines = useMechanismStore((s) => s.outlines);
-  const baseBodyId = useMechanismStore((s) => s.baseBodyId);
+  const images = useMechanismStore((s) => s.images);
   const selectedIds = useEditorStore((s) => s.selectedIds);
   const clearSelection = useEditorStore((s) => s.clearSelection);
   const moveJoint = useMechanismStore((s) => s.moveJoint);
   const regenerateLinks = useMechanismStore((s) => s.regenerateLinks);
-
-  const handleSave = () => {
-    const json = serializeMechanism(joints, links, bodies, baseBodyId, outlines);
-    const timestamp = new Date().toISOString().slice(0, 16).replace(/[:-]/g, '');
-    downloadFile(json, `linkage_${timestamp}.slinker`);
-  };
-
-  const handleOpen = async () => {
-    const json = await openFilePicker();
-    if (!json) return;
-    const state = deserializeMechanism(json);
-    if (!state) { alert('Invalid file format'); return; }
-    loadState(state);
-    useEditorStore.getState().clearSelection();
-  };
+  const removeTempJoint = useMechanismStore((s) => s.removeTempJoint);
+  const addImage = useMechanismStore((s) => s.addImage);
+  const baseBodyId = useMechanismStore((s) => s.baseBodyId);
 
   const hasSelection = selectedIds.size > 0;
   const handleDeleteSelected = () => {
     for (const id of selectedIds) {
       if (joints[id]) removeJoint(id);
       else if (outlines[id]) removeOutline(id);
+      else if (images[id]) removeImage(id);
     }
     clearSelection();
   };
 
-  const removeTempJoint = useMechanismStore((s) => s.removeTempJoint);
-
   const handleModeSwitch = (newMode: AppMode) => {
     if (newMode === mode) return;
 
-    // Clean up any temp joints from shape dragging
     const editorState = useEditorStore.getState();
     if (editorState.simDrag?.tempJointId) {
       removeTempJoint(editorState.simDrag.tempJointId);
@@ -67,7 +48,6 @@ export function Toolbar() {
     }
 
     if (newMode === 'simulate') {
-      // Auto-unlock outlines so reprojection happens before entering sim
       if (editorState.lockOutlines && editorState.frozenOutlineWorldPoints.size > 0) {
         useMechanismStore.getState().reprojectOutlinesFromWorld(editorState.frozenOutlineWorldPoints);
         editorState.setLockOutlines(false);
@@ -83,8 +63,9 @@ export function Toolbar() {
       regenerateLinks();
     } else {
       if (savedPositions) {
+        const currentJoints = useMechanismStore.getState().joints;
         for (const [id, pos] of Object.entries(savedPositions)) {
-          if (joints[id]) {
+          if (currentJoints[id]) {
             moveJoint(id, pos);
           }
         }
@@ -96,14 +77,39 @@ export function Toolbar() {
     setMode(newMode);
   };
 
+  const handleImportImage = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/jpeg,image/png,image/bmp,image/webp';
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result as string;
+        const img = new Image();
+        img.onload = () => {
+          // Place image at current camera center
+          const camera = useEditorStore.getState().camera;
+          const canvas = document.querySelector('canvas');
+          let center: Vec2 = { x: 0, y: 0 };
+          if (canvas) {
+            const rect = canvas.getBoundingClientRect();
+            center = screenToWorld({ x: rect.width / 2, y: rect.height / 2 }, camera);
+          }
+          const id = addImage(baseBodyId, dataUrl, img.naturalWidth, img.naturalHeight, center);
+          useEditorStore.getState().select(id);
+          setCreateTool('image');
+        };
+        img.src = dataUrl;
+      };
+      reader.readAsDataURL(file);
+    };
+    input.click();
+  };
+
   return (
     <div className="toolbar">
-      <div className="toolbar-section">
-        <div className="toolbar-label">File</div>
-        <button className="tool-btn" onClick={handleSave}>Save</button>
-        <button className="tool-btn" onClick={handleOpen}>Open</button>
-      </div>
-
       <div className="toolbar-section mode-toggle">
         <button
           className={`mode-btn ${mode === 'create' ? 'active' : ''}`}
@@ -151,13 +157,26 @@ export function Toolbar() {
             >
               Outline
             </button>
+            <button
+              className={`tool-btn ${createTool === 'image' ? 'active' : ''}`}
+              onClick={() => {
+                if (createTool === 'image') {
+                  // Already in image mode - open file picker to add another
+                  handleImportImage();
+                } else {
+                  setCreateTool('image');
+                  // If no images exist yet, auto-open the file picker
+                  const hasImages = Object.keys(useMechanismStore.getState().images).length > 0;
+                  if (!hasImages) handleImportImage();
+                }
+              }}
+            >
+              Image
+            </button>
           </div>
 
-          <div className="toolbar-section">
-            <div className="toolbar-label">Edit</div>
-            <button className="tool-btn" onClick={undo} title="Undo (Ctrl+Z)">Undo</button>
-            <button className="tool-btn" onClick={redo} title="Redo (Ctrl+Y)">Redo</button>
-            {hasSelection && (
+          {hasSelection && (
+            <div className="toolbar-section">
               <button
                 className="tool-btn"
                 onClick={handleDeleteSelected}
@@ -166,16 +185,8 @@ export function Toolbar() {
               >
                 Delete
               </button>
-            )}
-            <button
-              className="tool-btn"
-              onClick={() => { if (confirm('Clear everything?')) { clearAll(); clearSelection(); } }}
-              title="Clear all joints, bodies, and outlines"
-              style={{ color: '#f66', marginTop: 4 }}
-            >
-              Clear All
-            </button>
-          </div>
+            </div>
+          )}
 
           <div className="toolbar-section">
             {createTool === 'joints' && jointMode === 'manual' ? (
@@ -190,11 +201,18 @@ export function Toolbar() {
                 <div className="sim-hint">Click existing joint to end chain</div>
                 <div className="sim-hint">Escape to stop</div>
               </>
-            ) : (
+            ) : createTool === 'outline' ? (
               <>
                 <div className="sim-hint">Click to place outline points</div>
                 <div className="sim-hint">Click first point to close</div>
                 <div className="sim-hint">Escape to cancel</div>
+              </>
+            ) : (
+              <>
+                <div className="sim-hint">Click image to select</div>
+                <div className="sim-hint">Drag to move</div>
+                <div className="sim-hint">Drag corners to scale</div>
+                <div className="sim-hint">Drag top handle to rotate</div>
               </>
             )}
           </div>
@@ -209,9 +227,6 @@ export function Toolbar() {
       )}
 
       <div style={{ marginTop: 'auto', padding: '8px', borderTop: '1px solid #333' }}>
-        <div style={{ fontSize: 9, color: '#666', lineHeight: 1.4 }}>
-          Slinker v0.2.0
-        </div>
         <div style={{ fontSize: 9, color: '#555', lineHeight: 1.4 }}>
           VibeCoded by Hugo Wilson
         </div>

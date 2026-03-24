@@ -2,6 +2,7 @@ import type { Vec2 } from '../types';
 import { useEditorStore } from '../store/editor-store';
 import { useMechanismStore } from '../store/mechanism-store';
 import { hitTest, hitTestJoint, hitTestOutline, hitTestOutlineFilled } from './hit-test';
+import { hitTestImage, hitTestRotateHandle, hitTestScaleHandle } from '../renderer/draw-images';
 import { screenToWorld } from '../renderer/camera';
 import { snapToGrid, distance, sub, dot, lengthSq } from '../core/math/vec2';
 import { computeBodyTransform, worldToLocal } from '../core/body-transform';
@@ -16,6 +17,14 @@ let isDragging = false;
 let dragJointId: string | null = null;
 let isPanning = false;
 let lastMouse: Vec2 = { x: 0, y: 0 };
+
+// Image drag state
+let imageDragId: string | null = null;
+let imageDragType: 'move' | 'rotate' | 'scale' | null = null;
+let imageDragStart: Vec2 = { x: 0, y: 0 };
+let imageStartRotation = 0;
+let imageStartScale = 1;
+let imageStartPos: Vec2 = { x: 0, y: 0 };
 
 export function handleMouseDown(e: PointerEvent, canvas: HTMLCanvasElement) {
   const editor = useEditorStore.getState();
@@ -137,6 +146,56 @@ export function handleMouseDown(e: PointerEvent, canvas: HTMLCanvasElement) {
 
   if (editor.activeTool === 'pan') {
     isPanning = true;
+    return;
+  }
+
+  // --- IMAGE TOOL ---
+  if (editor.createTool === 'image') {
+    // Check if clicking on already-selected image handles
+    const selectedImageId = [...editor.selectedIds].find((id) => mechanism.images[id]);
+    if (selectedImageId) {
+      const img = mechanism.images[selectedImageId];
+      if (img) {
+        // Check rotate handle first
+        if (hitTestRotateHandle(worldPos, img, editor.camera.zoom)) {
+          imageDragId = selectedImageId;
+          imageDragType = 'rotate';
+          imageDragStart = worldPos;
+          imageStartRotation = img.rotation;
+          mechanism.pushHistory();
+          return;
+        }
+        // Check scale handles (corners)
+        if (hitTestScaleHandle(worldPos, img, editor.camera.zoom)) {
+          imageDragId = selectedImageId;
+          imageDragType = 'scale';
+          imageDragStart = worldPos;
+          imageStartScale = img.scale;
+          imageStartPos = img.position;
+          mechanism.pushHistory();
+          return;
+        }
+      }
+    }
+    // Check if clicking on any image
+    const allImages = Object.values(mechanism.images);
+    // Reverse so topmost (last drawn) is checked first
+    for (let i = allImages.length - 1; i >= 0; i--) {
+      const img = allImages[i];
+      if (hitTestImage(worldPos, img)) {
+        editor.select(img.id);
+        imageDragId = img.id;
+        imageDragType = 'move';
+        imageDragStart = worldPos;
+        imageStartPos = img.position;
+        mechanism.pushHistory();
+        return;
+      }
+    }
+    // Clicked empty space - deselect
+    if (editor.selectedIds.size > 0) {
+      editor.clearSelection();
+    }
     return;
   }
 
@@ -286,6 +345,40 @@ export function handleMouseMove(e: PointerEvent, canvas: HTMLCanvasElement) {
   }
 
   // --- CREATE MODE ---
+
+  // Image dragging
+  if (imageDragId && imageDragType) {
+    const img = mechanism.images[imageDragId];
+    if (img) {
+      if (imageDragType === 'move') {
+        const dx = worldPos.x - imageDragStart.x;
+        const dy = worldPos.y - imageDragStart.y;
+        mechanism.updateImage(imageDragId, {
+          position: { x: imageStartPos.x + dx, y: imageStartPos.y + dy },
+        });
+      } else if (imageDragType === 'rotate') {
+        // Angle from image center to current cursor vs start
+        const startAngle = Math.atan2(imageDragStart.y - img.position.y, imageDragStart.x - img.position.x);
+        const curAngle = Math.atan2(worldPos.y - img.position.y, worldPos.x - img.position.x);
+        mechanism.updateImage(imageDragId, {
+          rotation: imageStartRotation + (curAngle - startAngle),
+        });
+      } else if (imageDragType === 'scale') {
+        const startDist = Math.sqrt(
+          (imageDragStart.x - imageStartPos.x) ** 2 + (imageDragStart.y - imageStartPos.y) ** 2,
+        );
+        const curDist = Math.sqrt(
+          (worldPos.x - imageStartPos.x) ** 2 + (worldPos.y - imageStartPos.y) ** 2,
+        );
+        const ratio = startDist > 1 ? curDist / startDist : 1;
+        mechanism.updateImage(imageDragId, {
+          scale: Math.max(0.01, imageStartScale * ratio),
+        });
+      }
+    }
+    return;
+  }
+
   if (isDragging && dragJointId) {
     const pos = editor.gridEnabled && !e.altKey ? snapToGrid(worldPos, editor.gridSize) : worldPos;
     mechanism.moveJoint(dragJointId, pos);
@@ -314,6 +407,8 @@ export function handleMouseUp(_e: PointerEvent | MouseEvent) {
   isDragging = false;
   dragJointId = null;
   isPanning = false;
+  imageDragId = null;
+  imageDragType = null;
 }
 
 export function handleWheel(e: WheelEvent, canvas: HTMLCanvasElement) {
@@ -367,6 +462,7 @@ export function handleKeyDown(e: KeyboardEvent) {
     for (const id of editor.selectedIds) {
       if (mechanism.joints[id]) mechanism.removeJoint(id);
       else if (mechanism.outlines[id]) mechanism.removeOutline(id);
+      else if (mechanism.images[id]) mechanism.removeImage(id);
     }
     editor.clearSelection();
   }

@@ -1,7 +1,8 @@
-import type { Joint, Link, Body, Outline, Vec2, SimDragState, AppMode, ForceVector, CreateTool } from '../types';
+import type { Joint, Link, Body, Outline, CanvasImage, Vec2, SimDragState, AppMode, ForceVector, CreateTool } from '../types';
 import type { CameraState } from '../types';
 import { applyCamera, resetCamera } from './camera';
 import { drawMechanism, drawOutlineGhost } from './draw-mechanism';
+import { drawImages } from './draw-images';
 import { drawGrid, drawPathTraces, drawForceVectors, drawDragInteraction, drawModeBadge, drawHUD, clearCanvas, drawCOMMarkers } from './draw-overlays';
 import { lerp } from '../core/math/vec2';
 import { computeBodyTransform, localToWorld, polygonCentroid, polygonArea } from '../core/body-transform';
@@ -11,6 +12,7 @@ export interface RenderState {
   links: Record<string, Link>;
   bodies: Record<string, Body>;
   outlines: Record<string, Outline>;
+  images: Record<string, CanvasImage>;
   selectedIds: Set<string>;
   hoveredId: string | null;
   camera: CameraState;
@@ -47,6 +49,9 @@ export function render(
   if (state.gridEnabled) {
     drawGrid(ctx, state.camera, w, h, state.gridSize);
   }
+
+  // Draw images behind mechanism
+  drawImages(ctx, state.images, state.camera.zoom, state.selectedIds);
 
   drawMechanism(ctx, state.joints, state.links, state.bodies, state.outlines, state.selectedIds, state.hoveredId, state.camera.zoom, state.showLinks, state.baseBodyId, state.frozenOutlinePoints);
 
