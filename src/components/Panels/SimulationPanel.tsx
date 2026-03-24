@@ -35,6 +35,7 @@ export function SimulationPanel() {
   const showLinks = useEditorStore((s) => s.showLinks);
   const showVectors = useEditorStore((s) => s.showVectors);
   const lockOutlines = useEditorStore((s) => s.lockOutlines);
+  const gridLevel = useEditorStore((s) => s.gridLevel);
 
   // Physics controls - visible in both modes
   const physicsSection = (
@@ -151,6 +152,27 @@ export function SimulationPanel() {
           Lock outlines
         </label>
       )}
+      <div style={{ fontSize: 11, color: '#999', marginTop: 6 }}>Grid (G)</div>
+      <div style={{ display: 'flex', gap: 2 }}>
+        {(['normal', 'fine', 'ultrafine', 'off'] as const).map((level) => (
+          <button
+            key={level}
+            onClick={() => useEditorStore.getState().setGridLevel(level)}
+            style={{
+              flex: 1,
+              padding: '3px 0',
+              fontSize: 10,
+              border: '1px solid #444',
+              borderRadius: 3,
+              cursor: 'pointer',
+              background: gridLevel === level ? '#4a9eff' : '#2a2a2a',
+              color: gridLevel === level ? '#fff' : '#aaa',
+            }}
+          >
+            {level === 'ultrafine' ? 'Ultra' : level.charAt(0).toUpperCase() + level.slice(1)}
+          </button>
+        ))}
+      </div>
     </>
   );
 

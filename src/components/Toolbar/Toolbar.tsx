@@ -10,7 +10,6 @@ export function Toolbar() {
   const mode = useEditorStore((s) => s.mode);
   const createTool = useEditorStore((s) => s.createTool);
   const jointMode = useEditorStore((s) => s.jointMode);
-  const gridLevel = useEditorStore((s) => s.gridLevel);
   const setCreateTool = useEditorStore((s) => s.setCreateTool);
   const setJointMode = useEditorStore((s) => s.setJointMode);
   const setMode = useEditorStore((s) => s.setMode);
@@ -273,19 +272,6 @@ export function Toolbar() {
               </button>
             </div>
           )}
-
-          <div className="toolbar-section">
-            <div className="toolbar-label">Grid (G)</div>
-            {(['normal', 'fine', 'ultrafine', 'off'] as const).map((level) => (
-              <button
-                key={level}
-                className={`tool-btn sub ${gridLevel === level ? 'active' : ''}`}
-                onClick={() => useEditorStore.getState().setGridLevel(level)}
-              >
-                {level === 'normal' ? 'Normal' : level === 'fine' ? 'Fine' : level === 'ultrafine' ? 'Ultra-fine' : 'Off'}
-              </button>
-            ))}
-          </div>
 
           <div className="toolbar-section">
             {renderHints()}
