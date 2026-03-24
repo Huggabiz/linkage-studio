@@ -350,10 +350,10 @@ export function solveWithForce(
       }
 
       // Slider constraints: B must lie on segment AC (between A and C).
-      // Two sub-constraints enforced:
-      //   1. Perpendicular: B on the line through AC
-      //   2. Along-axis: B between A and C (0 ≤ t ≤ 1)
-      // Both are bidirectional — corrections distributed across free joints.
+      // B acts as a sliding pivot — the body with A&C can both slide along
+      // the rail axis AND rotate around B. The perpendicular correction uses
+      // lever-arm weighting so A and C get different corrections based on
+      // their distance from B, naturally producing torque/rotation.
       for (const slider of sliderArray) {
         const idxA = jointIndex.get(slider.jointIdA);
         const idxB = jointIndex.get(slider.jointIdB);
@@ -385,44 +385,65 @@ export function solveWithForce(
         // Unit vectors: along AC and perpendicular
         let ux = acx / acLen;
         let uy = acy / acLen;
-        const perpX = -uy;
-        const perpY = ux;
+        let perpX = -uy;
+        let perpY = ux;
 
         // B's position relative to A in (along, perp) coordinates
         let abx = bx - ax;
         let aby = by - ay;
-        const perpDist = abx * perpX + aby * perpY;
-        const alongDist = abx * ux + aby * uy;
-        const tParam = alongDist / acLen; // B's parametric position (unclamped)
+        let perpDist = abx * perpX + aby * perpY;
+        let alongDist = abx * ux + aby * uy;
 
-        // --- Sub-constraint 1: Perpendicular correction ---
+        // --- Sub-constraint 1: Perpendicular correction (rotation-aware) ---
+        //
+        // B is at parameter t along AC. To make line AC pass through B with
+        // minimum energy, we weight A and C's perpendicular corrections by
+        // their lever arm from B:
+        //   A moves by d*(1-t) / ((1-t)² + t²)  in perp direction
+        //   C moves by d*t     / ((1-t)² + t²)  in perp direction
+        // This naturally produces rotation around B:
+        //   - t≈0.5 (B centered): equal correction → pure translation
+        //   - t≈0   (B near A):   A moves a lot, C barely → rotation around A
+        //   - t≈1   (B near C):   C moves a lot, A barely → rotation around C
         if (Math.abs(perpDist) > 1e-10) {
           const hasBSide = freeB;
           const hasACSide = freeA || freeC;
           if (hasBSide || hasACSide) {
-            // Split correction between B side and AC side (50/50 if both free)
+            // Split between B-side and AC-side
             const bFrac = hasBSide ? (hasACSide ? 0.5 : 1.0) : 0;
-            const acFrac = hasACSide ? (hasBSide ? 0.5 : 1.0) : 0;
+            const acTotalFrac = hasACSide ? (hasBSide ? 0.5 : 1.0) : 0;
 
-            // B moves toward line (in -perp direction)
+            // B moves toward line
             if (freeB) {
               bx -= perpX * perpDist * bFrac;
               by -= perpY * perpDist * bFrac;
               predicted[idxB!] = bx;
               predicted[idxB! + 1] = by;
             }
-            // A&C move to push line toward B (in +perp direction)
-            if (freeA) {
-              ax += perpX * perpDist * acFrac;
-              ay += perpY * perpDist * acFrac;
-              predicted[idxA!] = ax;
-              predicted[idxA! + 1] = ay;
-            }
-            if (freeC) {
-              cx2 += perpX * perpDist * acFrac;
-              cy2 += perpY * perpDist * acFrac;
-              predicted[idxC!] = cx2;
-              predicted[idxC! + 1] = cy2;
+
+            // A&C: lever-arm weighted perpendicular correction
+            if (hasACSide && acTotalFrac > 0) {
+              // Clamp t to [0,1] for lever arm computation
+              const tClamped = Math.max(0, Math.min(1, alongDist / acLen));
+              const wA = 1 - tClamped; // A's lever weight (large when B near C)
+              const wC = tClamped;     // C's lever weight (large when B near A)
+              const denom = wA * wA + wC * wC;
+              // Fallback to equal weights if B is at a degenerate position
+              const corrA = denom > 1e-10 ? acTotalFrac * perpDist * wA / denom : acTotalFrac * perpDist * 0.5;
+              const corrC = denom > 1e-10 ? acTotalFrac * perpDist * wC / denom : acTotalFrac * perpDist * 0.5;
+
+              if (freeA) {
+                ax += perpX * corrA;
+                ay += perpY * corrA;
+                predicted[idxA!] = ax;
+                predicted[idxA! + 1] = ay;
+              }
+              if (freeC) {
+                cx2 += perpX * corrC;
+                cy2 += perpY * corrC;
+                predicted[idxC!] = cx2;
+                predicted[idxC! + 1] = cy2;
+              }
             }
           }
         }
@@ -442,38 +463,30 @@ export function solveWithForce(
         const tCorrected = (abx * ux + aby * uy) / acLen;
 
         if (tCorrected < 0) {
-          // B is before A — slide segment so B is at A's position
+          // B is before A — slide entire segment so B ends up at A
           const overshoot = -tCorrected * acLen;
           if (freeB && (freeA || freeC)) {
-            // Split: move B forward, move A(&C) backward
-            const bShare = freeB ? 0.5 : 0;
-            const acShift = freeB ? 0.5 : 1;
-            if (freeB) { predicted[idxB!] += ux * overshoot * bShare; predicted[idxB! + 1] += uy * overshoot * bShare; }
-            // Slide entire segment to preserve A-C distance
-            if (freeA) { predicted[idxA!] -= ux * overshoot * acShift; predicted[idxA! + 1] -= uy * overshoot * acShift; }
-            if (freeC) { predicted[idxC!] -= ux * overshoot * acShift; predicted[idxC! + 1] -= uy * overshoot * acShift; }
+            if (freeB) { predicted[idxB!] += ux * overshoot * 0.5; predicted[idxB! + 1] += uy * overshoot * 0.5; }
+            if (freeA) { predicted[idxA!] -= ux * overshoot * 0.5; predicted[idxA! + 1] -= uy * overshoot * 0.5; }
+            if (freeC) { predicted[idxC!] -= ux * overshoot * 0.5; predicted[idxC! + 1] -= uy * overshoot * 0.5; }
           } else if (freeB) {
             predicted[idxB!] += ux * overshoot;
             predicted[idxB! + 1] += uy * overshoot;
           } else if (freeA || freeC) {
-            // B is fixed — slide entire AC segment backward
             if (freeA) { predicted[idxA!] -= ux * overshoot; predicted[idxA! + 1] -= uy * overshoot; }
             if (freeC) { predicted[idxC!] -= ux * overshoot; predicted[idxC! + 1] -= uy * overshoot; }
           }
         } else if (tCorrected > 1) {
-          // B is past C — slide segment so B is at C's position
+          // B is past C — slide entire segment so B ends up at C
           const overshoot = (tCorrected - 1) * acLen;
           if (freeB && (freeA || freeC)) {
-            const bShare = freeB ? 0.5 : 0;
-            const acShift = freeB ? 0.5 : 1;
-            if (freeB) { predicted[idxB!] -= ux * overshoot * bShare; predicted[idxB! + 1] -= uy * overshoot * bShare; }
-            if (freeA) { predicted[idxA!] += ux * overshoot * acShift; predicted[idxA! + 1] += uy * overshoot * acShift; }
-            if (freeC) { predicted[idxC!] += ux * overshoot * acShift; predicted[idxC! + 1] += uy * overshoot * acShift; }
+            if (freeB) { predicted[idxB!] -= ux * overshoot * 0.5; predicted[idxB! + 1] -= uy * overshoot * 0.5; }
+            if (freeA) { predicted[idxA!] += ux * overshoot * 0.5; predicted[idxA! + 1] += uy * overshoot * 0.5; }
+            if (freeC) { predicted[idxC!] += ux * overshoot * 0.5; predicted[idxC! + 1] += uy * overshoot * 0.5; }
           } else if (freeB) {
             predicted[idxB!] -= ux * overshoot;
             predicted[idxB! + 1] -= uy * overshoot;
           } else if (freeA || freeC) {
-            // B is fixed — slide entire AC segment forward
             if (freeA) { predicted[idxA!] += ux * overshoot; predicted[idxA! + 1] += uy * overshoot; }
             if (freeC) { predicted[idxC!] += ux * overshoot; predicted[idxC! + 1] += uy * overshoot; }
           }
