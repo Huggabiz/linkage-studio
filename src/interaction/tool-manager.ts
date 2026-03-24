@@ -5,8 +5,27 @@ import { hitTest, hitTestJoint, hitTestOutline, hitTestOutlineFilled } from './h
 import { hitTestImage, hitTestRotateHandle, hitTestScaleHandle } from '../renderer/draw-images';
 import { screenToWorld } from '../renderer/camera';
 import { snapToGrid, distance, sub, dot, lengthSq } from '../core/math/vec2';
-import { computeBodyTransform, worldToLocal } from '../core/body-transform';
+import { computeBodyTransform, worldToLocal, localToWorld } from '../core/body-transform';
 import { HIT_RADIUS } from '../utils/constants';
+
+/** Exit outline editing mode and update frozen world points. */
+function exitOutlineEditMode() {
+  const editor = useEditorStore.getState();
+  const mechanism = useMechanismStore.getState();
+  const outlineId = editor.editingOutlineId;
+  if (outlineId) {
+    const outline = mechanism.outlines[outlineId];
+    if (outline) {
+      const body = mechanism.bodies[outline.bodyId];
+      if (body) {
+        const transform = computeBodyTransform(body, mechanism.joints);
+        const worldPts = outline.points.map((p) => localToWorld(p, transform));
+        editor.updateFrozenOutline(outlineId, worldPts);
+      }
+    }
+  }
+  editor.setEditingOutline(null);
+}
 
 function isFixed(jointId: string): boolean {
   const { bodies, baseBodyId } = useMechanismStore.getState();
@@ -22,6 +41,10 @@ let lastMouse: Vec2 = { x: 0, y: 0 };
 let sliderLineDragId: string | null = null;
 let sliderLineDragStart: Vec2 = { x: 0, y: 0 };
 let sliderLineDragStartPositions: { a: Vec2; b: Vec2; c: Vec2 } | null = null;
+
+// Outline vertex drag state
+let outlineVertexDragIndex: number | null = null;
+let outlineVertexDragOutlineId: string | null = null;
 
 // Image drag state
 let imageDragId: string | null = null;
@@ -275,6 +298,59 @@ export function handleMouseDown(e: PointerEvent, canvas: HTMLCanvasElement) {
 
   // --- OUTLINE TOOL ---
   if (editor.createTool === 'outline') {
+    // --- OUTLINE EDIT MODE ---
+    if (editor.editingOutlineId) {
+      const outline = mechanism.outlines[editor.editingOutlineId];
+      if (outline) {
+        const body = mechanism.bodies[outline.bodyId];
+        if (body) {
+          const transform = computeBodyTransform(body, mechanism.joints);
+          const worldPts = outline.points.map((p) => localToWorld(p, transform));
+          const hitRadius = HIT_RADIUS / editor.camera.zoom;
+
+          // Check vertex hit
+          for (let i = 0; i < worldPts.length; i++) {
+            if (distance(worldPos, worldPts[i]) < hitRadius) {
+              editor.setEditingVertexIndex(i);
+              outlineVertexDragIndex = i;
+              outlineVertexDragOutlineId = editor.editingOutlineId;
+              mechanism.pushHistory();
+              return;
+            }
+          }
+
+          // Check edge hit (insert vertex)
+          for (let i = 0; i < worldPts.length; i++) {
+            const j = (i + 1) % worldPts.length;
+            const a = worldPts[i];
+            const b = worldPts[j];
+            const ab = sub(b, a);
+            const ap = sub(worldPos, a);
+            const abLenSq = lengthSq(ab);
+            if (abLenSq < 1e-8) continue;
+            const t = Math.max(0, Math.min(1, dot(ap, ab) / abLenSq));
+            const closest = { x: a.x + ab.x * t, y: a.y + ab.y * t };
+            if (distance(worldPos, closest) < hitRadius) {
+              // Insert new vertex at the clicked position
+              const localPt = worldToLocal(worldPos, transform);
+              mechanism.insertOutlineVertex(editor.editingOutlineId, i, localPt);
+              editor.setEditingVertexIndex(i + 1);
+              outlineVertexDragIndex = i + 1;
+              outlineVertexDragOutlineId = editor.editingOutlineId;
+              return;
+            }
+          }
+
+          // Clicked away from shape — exit edit mode
+          exitOutlineEditMode();
+          return;
+        }
+      }
+      exitOutlineEditMode();
+      return;
+    }
+
+    // --- OUTLINE DRAWING MODE ---
     const pos = editor.gridEnabled ? snapToGrid(worldPos, editor.gridSize) : worldPos;
     const points = editor.outlinePoints;
 
@@ -476,6 +552,22 @@ export function handleMouseMove(e: PointerEvent, canvas: HTMLCanvasElement) {
     return;
   }
 
+  // Outline vertex dragging
+  if (outlineVertexDragIndex !== null && outlineVertexDragOutlineId) {
+    const outline = mechanism.outlines[outlineVertexDragOutlineId];
+    if (outline) {
+      const body = mechanism.bodies[outline.bodyId];
+      if (body) {
+        const transform = computeBodyTransform(body, mechanism.joints);
+        const localPt = worldToLocal(worldPos, transform);
+        const newPoints = [...outline.points];
+        newPoints[outlineVertexDragIndex] = localPt;
+        mechanism.updateOutlinePoints(outlineVertexDragOutlineId, newPoints);
+      }
+    }
+    return;
+  }
+
   // Image dragging
   if (imageDragId && imageDragType) {
     const img = mechanism.images[imageDragId];
@@ -516,12 +608,12 @@ export function handleMouseMove(e: PointerEvent, canvas: HTMLCanvasElement) {
     const slider = mechanism.getSliderForJoint(dragJointId);
     if (slider) {
       if (dragJointId === slider.jointIdB) {
-        // B: constrain to line AC
+        // B: constrain to line AC (use unsnapped worldPos so B slides freely)
         const jA = mechanism.joints[slider.jointIdA];
         const jC = mechanism.joints[slider.jointIdC];
         if (jA && jC) {
           const ac = sub(jC.position, jA.position);
-          const ap = sub(pos, jA.position);
+          const ap = sub(worldPos, jA.position);
           const acLenSq = lengthSq(ac);
           const t = acLenSq > 1e-8 ? Math.max(0, Math.min(1, dot(ap, ac) / acLenSq)) : 0.5;
           const constrained = { x: jA.position.x + ac.x * t, y: jA.position.y + ac.y * t };
@@ -571,6 +663,8 @@ export function handleMouseUp(_e: PointerEvent | MouseEvent) {
   imageDragType = null;
   sliderLineDragId = null;
   sliderLineDragStartPositions = null;
+  outlineVertexDragIndex = null;
+  outlineVertexDragOutlineId = null;
 }
 
 export function handleWheel(e: WheelEvent, canvas: HTMLCanvasElement) {
@@ -609,7 +703,9 @@ export function handleKeyDown(e: KeyboardEvent) {
     switch (e.key) {
       case 'g': editor.cycleGrid(); return;
       case 'Escape':
-        if (editor.sliderPointA) {
+        if (editor.editingOutlineId) {
+          exitOutlineEditMode();
+        } else if (editor.sliderPointA) {
           // Cancel slider placement — remove the already-placed A joint
           mechanism.undo(); // undo the addJoint for A
           editor.setSliderPointA(null);
@@ -625,6 +721,15 @@ export function handleKeyDown(e: KeyboardEvent) {
   }
 
   if (e.key === 'Delete' || e.key === 'Backspace') {
+    // If editing outline and a vertex is selected, delete the vertex
+    if (editor.editingOutlineId && editor.editingVertexIndex !== null) {
+      const outline = mechanism.outlines[editor.editingOutlineId];
+      if (outline && outline.points.length > 3) {
+        mechanism.removeOutlineVertex(editor.editingOutlineId, editor.editingVertexIndex);
+        editor.setEditingVertexIndex(null);
+      }
+      return;
+    }
     for (const id of editor.selectedIds) {
       if (mechanism.joints[id]) mechanism.removeJoint(id);
       else if (mechanism.outlines[id]) mechanism.removeOutline(id);

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useEditorStore } from '../../store/editor-store';
 import { useMechanismStore } from '../../store/mechanism-store';
 import { BODY_COLORS } from '../../utils/constants';
+import { computeBodyTransform, localToWorld } from '../../core/body-transform';
 
 /** Eye open SVG icon */
 function EyeIcon() {
@@ -61,6 +62,9 @@ export function BodyPanel() {
   const selectedIds = useEditorStore((s) => s.selectedIds);
   const select = useEditorStore((s) => s.select);
   const createTool = useEditorStore((s) => s.createTool);
+  const editingOutlineId = useEditorStore((s) => s.editingOutlineId);
+  const setEditingOutline = useEditorStore((s) => s.setEditingOutline);
+  const updateFrozenOutline = useEditorStore((s) => s.updateFrozenOutline);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [collapsedBodies, setCollapsedBodies] = useState<Set<string>>(new Set());
@@ -201,10 +205,6 @@ export function BodyPanel() {
                 </span>
               )}
 
-              {/* Joint count */}
-              <span style={{ fontSize: 10, opacity: 0.6 }}>
-                {body.jointIds.length}j
-              </span>
 
               {/* CoA toggle */}
               {bodyOutlines.length > 0 && (
@@ -312,7 +312,48 @@ export function BodyPanel() {
                         </span>
                       )}
 
-                      <span style={{ fontSize: 9, opacity: 0.5 }}>{outline.points.length}v</span>
+
+                      {/* Edit vertices */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (editingOutlineId === outline.id) {
+                            // Exiting edit mode: update frozen points
+                            const b = bodies[outline.bodyId];
+                            if (b) {
+                              const transform = computeBodyTransform(b, joints);
+                              const worldPts = outline.points.map((p) => localToWorld(p, transform));
+                              updateFrozenOutline(outline.id, worldPts);
+                            }
+                            setEditingOutline(null);
+                          } else {
+                            // If exiting another outline's edit mode first, update its frozen points
+                            if (editingOutlineId) {
+                              const prevOutline = outlines[editingOutlineId];
+                              if (prevOutline) {
+                                const b = bodies[prevOutline.bodyId];
+                                if (b) {
+                                  const transform = computeBodyTransform(b, joints);
+                                  const worldPts = prevOutline.points.map((p) => localToWorld(p, transform));
+                                  updateFrozenOutline(editingOutlineId, worldPts);
+                                }
+                              }
+                            }
+                            setEditingOutline(outline.id);
+                          }
+                        }}
+                        title="Edit shape vertices"
+                        style={{
+                          background: 'none', border: 'none', cursor: 'pointer',
+                          padding: '0 2px', lineHeight: 1, display: 'flex', alignItems: 'center',
+                          color: editingOutlineId === outline.id ? '#4A9EFF' : '#777',
+                        }}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                      </button>
 
                       {/* Delete */}
                       <button

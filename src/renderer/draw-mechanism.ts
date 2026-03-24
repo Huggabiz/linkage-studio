@@ -275,6 +275,45 @@ export function drawOutlines(
   }
 }
 
+/** Draw outline in editing mode: blue dashed border + draggable vertex squares. */
+export function drawOutlineEditMode(
+  ctx: CanvasRenderingContext2D,
+  worldPoints: Vec2[],
+  zoom: number,
+  selectedVertexIndex: number | null,
+) {
+  if (worldPoints.length < 2) return;
+
+  // Draw blue dashed outline
+  ctx.beginPath();
+  ctx.moveTo(worldPoints[0].x, worldPoints[0].y);
+  for (let i = 1; i < worldPoints.length; i++) {
+    ctx.lineTo(worldPoints[i].x, worldPoints[i].y);
+  }
+  ctx.closePath();
+  ctx.strokeStyle = SELECTION_COLOR;
+  ctx.lineWidth = 2 / zoom;
+  ctx.setLineDash([6 / zoom, 4 / zoom]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Light fill
+  ctx.fillStyle = 'rgba(74, 158, 255, 0.08)';
+  ctx.fill();
+
+  // Draw vertex squares
+  const vertSize = 5 / zoom;
+  for (let i = 0; i < worldPoints.length; i++) {
+    const p = worldPoints[i];
+    const isSelected = i === selectedVertexIndex;
+    ctx.fillStyle = isSelected ? SELECTION_COLOR : '#fff';
+    ctx.fillRect(p.x - vertSize, p.y - vertSize, vertSize * 2, vertSize * 2);
+    ctx.strokeStyle = isSelected ? '#fff' : SELECTION_COLOR;
+    ctx.lineWidth = 1.5 / zoom;
+    ctx.strokeRect(p.x - vertSize, p.y - vertSize, vertSize * 2, vertSize * 2);
+  }
+}
+
 /** Draw the in-progress outline ghost (world-space points + cursor). */
 export function drawOutlineGhost(
   ctx: CanvasRenderingContext2D,

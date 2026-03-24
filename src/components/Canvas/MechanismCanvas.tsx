@@ -8,6 +8,7 @@ import {
   handleMouseDown, handleMouseMove, handleMouseUp, handleDoubleClick, handleWheel, handleKeyDown,
 } from '../../interaction/tool-manager';
 import { hitTest, hitTestOutlineFilled } from '../../interaction/hit-test';
+import { hitTestImage, hitTestRotateHandle, hitTestScaleHandle } from '../../renderer/draw-images';
 import type { Vec2 } from '../../types';
 
 // --- Touch gesture state (module-level, survives re-renders) ---
@@ -81,6 +82,8 @@ export function MechanismCanvas() {
         baseBodyId: mechanism.baseBodyId,
         frozenOutlinePoints: editor.lockOutlines ? editor.frozenOutlineWorldPoints : undefined,
         sliderPointA: editor.sliderPointA?.position ?? null,
+        editingOutlineId: editor.editingOutlineId,
+        editingVertexIndex: editor.editingVertexIndex,
       });
     } catch (e) {
       console.error('Render error:', e);
@@ -199,9 +202,29 @@ export function MechanismCanvas() {
         const mechanism = useMechanismStore.getState();
         const worldPos = screenToWorld(screenPos, editor.camera);
 
-        // Check if touching a joint, link, or filled outline
-        const componentHit = hitTest(worldPos, mechanism.joints, mechanism.links, editor.camera.zoom)
+        // Check if touching a joint, link, filled outline, or image (including handles)
+        let componentHit = hitTest(worldPos, mechanism.joints, mechanism.links, editor.camera.zoom)
           || hitTestOutlineFilled(worldPos, mechanism.outlines, mechanism.bodies, mechanism.joints, mechanism.baseBodyId);
+
+        // Also check images and their handles
+        if (!componentHit && editor.createTool === 'image') {
+          const selectedImageId = [...editor.selectedIds].find((id) => mechanism.images[id]);
+          if (selectedImageId) {
+            const img = mechanism.images[selectedImageId];
+            if (img && (hitTestRotateHandle(worldPos, img, editor.camera.zoom)
+                     || hitTestScaleHandle(worldPos, img, editor.camera.zoom))) {
+              componentHit = true;
+            }
+          }
+          if (!componentHit) {
+            for (const img of Object.values(mechanism.images)) {
+              if (hitTestImage(worldPos, img)) {
+                componentHit = true;
+                break;
+              }
+            }
+          }
+        }
 
         if (componentHit) {
           // Finger landed on a component → forward to tool-manager immediately for drag interaction
@@ -310,6 +333,10 @@ export function MechanismCanvas() {
 
         if (gestureState === 'pending' && touchStartPos && e.pointerId === touchStartPointerId) {
           // Finger lifted without significant movement → TAP
+          // Update cursor world position so outline ghost draws correctly
+          const rect = canvas.getBoundingClientRect();
+          const screen = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+          cursorWorldRef.current = screenToWorld(screen, useEditorStore.getState().camera);
           // Fire down + up at the touch position to trigger the action (place joint, select, etc.)
           handleMouseDown(e.nativeEvent as PointerEvent, canvas);
           handleMouseUp(e.nativeEvent as PointerEvent);

@@ -67,6 +67,11 @@ interface EditorStore {
   setLockOutlines(locked: boolean, frozenPoints?: Map<string, Vec2[]>): void;
   setImageDragMode(mode: 'move' | 'rotate' | 'scale' | null): void;
   setSliderPointA(point: { position: Vec2; jointId: string } | null): void;
+  editingOutlineId: string | null;
+  editingVertexIndex: number | null;
+  setEditingOutline(outlineId: string | null): void;
+  setEditingVertexIndex(index: number | null): void;
+  updateFrozenOutline(outlineId: string, worldPoints: Vec2[]): void;
 }
 
 export const useEditorStore = create<EditorStore>((set) => ({
@@ -93,9 +98,11 @@ export const useEditorStore = create<EditorStore>((set) => ({
   frozenOutlineWorldPoints: new Map(),
   imageDragMode: null,
   sliderPointA: null,
+  editingOutlineId: null,
+  editingVertexIndex: null,
 
   setMode(mode) {
-    set({ mode, simDrag: null, linkStartJointId: null, selectedIds: new Set(), outlinePoints: [], createTool: 'joints' as CreateTool, jointMode: 'manual' as JointMode, autoChainLastBodyId: null, lockOutlines: true, frozenOutlineWorldPoints: new Map(), sliderPointA: null });
+    set({ mode, simDrag: null, linkStartJointId: null, selectedIds: new Set(), outlinePoints: [], createTool: 'joints' as CreateTool, jointMode: 'manual' as JointMode, autoChainLastBodyId: null, lockOutlines: true, frozenOutlineWorldPoints: new Map(), sliderPointA: null, editingOutlineId: null, editingVertexIndex: null });
   },
 
   setTool(tool) {
@@ -198,7 +205,7 @@ export const useEditorStore = create<EditorStore>((set) => ({
   },
 
   setCreateTool(tool) {
-    set({ createTool: tool, outlinePoints: [], jointMode: 'manual' as JointMode, autoChainLastBodyId: null, sliderPointA: null });
+    set({ createTool: tool, outlinePoints: [], jointMode: 'manual' as JointMode, autoChainLastBodyId: null, sliderPointA: null, editingOutlineId: null, editingVertexIndex: null });
   },
 
   setJointMode(mode) {
@@ -231,5 +238,25 @@ export const useEditorStore = create<EditorStore>((set) => ({
 
   setSliderPointA(point) {
     set({ sliderPointA: point });
+  },
+
+  setEditingOutline(outlineId) {
+    if (outlineId) {
+      set({ editingOutlineId: outlineId, editingVertexIndex: null, selectedIds: new Set([outlineId]), createTool: 'outline' as CreateTool, outlinePoints: [] });
+    } else {
+      set({ editingOutlineId: null, editingVertexIndex: null, selectedIds: new Set() });
+    }
+  },
+
+  setEditingVertexIndex(index) {
+    set({ editingVertexIndex: index });
+  },
+
+  updateFrozenOutline(outlineId, worldPoints) {
+    set((s) => {
+      const frozen = new Map(s.frozenOutlineWorldPoints);
+      frozen.set(outlineId, worldPoints);
+      return { frozenOutlineWorldPoints: frozen };
+    });
   },
 }));

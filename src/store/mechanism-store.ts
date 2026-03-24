@@ -55,6 +55,9 @@ interface MechanismStore {
   toggleOutlineCOM(bodyId: string): void;
   toggleBodyShowLinks(bodyId: string): void;
   toggleOutlineVisible(outlineId: string): void;
+  updateOutlinePoints(outlineId: string, points: Vec2[]): void;
+  insertOutlineVertex(outlineId: string, afterIndex: number, point: Vec2): void;
+  removeOutlineVertex(outlineId: string, vertexIndex: number): void;
 
   addImage(bodyId: string, src: string, naturalWidth: number, naturalHeight: number, position: Vec2): string;
   removeImage(id: string): void;
@@ -611,6 +614,35 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
       const outline = s.outlines[outlineId];
       if (!outline) return s;
       return { outlines: { ...s.outlines, [outlineId]: { ...outline, visible: !outline.visible } } };
+    });
+  },
+
+  updateOutlinePoints(outlineId, points) {
+    set((s) => {
+      const outline = s.outlines[outlineId];
+      if (!outline) return s;
+      return { outlines: { ...s.outlines, [outlineId]: { ...outline, points } } };
+    });
+  },
+
+  insertOutlineVertex(outlineId, afterIndex, point) {
+    get().pushHistory();
+    set((s) => {
+      const outline = s.outlines[outlineId];
+      if (!outline) return s;
+      const newPoints = [...outline.points];
+      newPoints.splice(afterIndex + 1, 0, point);
+      return { outlines: { ...s.outlines, [outlineId]: { ...outline, points: newPoints } } };
+    });
+  },
+
+  removeOutlineVertex(outlineId, vertexIndex) {
+    get().pushHistory();
+    set((s) => {
+      const outline = s.outlines[outlineId];
+      if (!outline || outline.points.length <= 3) return s; // Need at least 3 vertices
+      const newPoints = outline.points.filter((_, i) => i !== vertexIndex);
+      return { outlines: { ...s.outlines, [outlineId]: { ...outline, points: newPoints } } };
     });
   },
 }));

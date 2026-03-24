@@ -29,8 +29,24 @@ export function Toolbar() {
   const addImage = useMechanismStore((s) => s.addImage);
   const baseBodyId = useMechanismStore((s) => s.baseBodyId);
 
+  const editingOutlineId = useEditorStore((s) => s.editingOutlineId);
+  const editingVertexIndex = useEditorStore((s) => s.editingVertexIndex);
+  const removeOutlineVertex = useMechanismStore((s) => s.removeOutlineVertex);
+  const setEditingVertexIndex = useEditorStore((s) => s.setEditingVertexIndex);
+
   const hasSelection = selectedIds.size > 0;
+  const hasVertexSelection = editingOutlineId !== null && editingVertexIndex !== null;
+  const canDeleteVertex = hasVertexSelection && (() => {
+    const outline = outlines[editingOutlineId!];
+    return outline && outline.points.length > 3;
+  })();
+
   const handleDeleteSelected = () => {
+    if (hasVertexSelection && canDeleteVertex) {
+      removeOutlineVertex(editingOutlineId!, editingVertexIndex!);
+      setEditingVertexIndex(null);
+      return;
+    }
     for (const id of selectedIds) {
       if (joints[id]) removeJoint(id);
       else if (outlines[id]) removeOutline(id);
@@ -260,15 +276,16 @@ export function Toolbar() {
             </button>
           </div>
 
-          {hasSelection && (
+          {(hasSelection || hasVertexSelection) && (
             <div className="toolbar-section">
               <button
                 className="tool-btn"
                 onClick={handleDeleteSelected}
-                title="Delete selected (Backspace)"
+                title={hasVertexSelection ? 'Delete vertex (Backspace)' : 'Delete selected (Backspace)'}
                 style={{ color: '#E53935' }}
+                disabled={hasVertexSelection && !canDeleteVertex}
               >
-                Delete
+                {hasVertexSelection ? 'Delete Vertex' : 'Delete'}
               </button>
             </div>
           )}
