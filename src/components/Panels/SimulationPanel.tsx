@@ -1,6 +1,7 @@
 import { useSimulationStore } from '../../store/simulation-store';
 import { useMechanismStore } from '../../store/mechanism-store';
 import { useEditorStore } from '../../store/editor-store';
+import { computeBodyTransform, localToWorld } from '../../core/body-transform';
 
 export function SimulationPanel() {
   const mode = useEditorStore((s) => s.mode);
@@ -120,7 +121,28 @@ export function SimulationPanel() {
           <input
             type="checkbox"
             checked={useEditorStore((s) => s.lockOutlines)}
-            onChange={() => useEditorStore.getState().toggleLockOutlines()}
+            onChange={() => {
+              const editor = useEditorStore.getState();
+              const mech = useMechanismStore.getState();
+              if (!editor.lockOutlines) {
+                // Locking: snapshot current world-space outline positions
+                const frozen = new Map<string, import('../../types').Vec2[]>();
+                for (const outline of Object.values(mech.outlines)) {
+                  const body = mech.bodies[outline.bodyId];
+                  if (!body || outline.points.length < 2) continue;
+                  const transform = computeBodyTransform(body, mech.joints);
+                  frozen.set(outline.id, outline.points.map((p) => localToWorld(p, transform)));
+                }
+                editor.setLockOutlines(true, frozen);
+              } else {
+                // Unlocking: reproject outlines to stay at their frozen positions
+                const frozen = editor.frozenOutlineWorldPoints;
+                if (frozen.size > 0) {
+                  mech.reprojectOutlinesFromWorld(frozen);
+                }
+                editor.setLockOutlines(false);
+              }
+            }}
           />
           Lock outlines
         </label>
