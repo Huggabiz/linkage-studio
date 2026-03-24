@@ -1,7 +1,20 @@
 import { create } from 'zustand';
-import type { AppMode, ToolType, JointSubType, CreateTool, JointMode, CameraState, SimDragState } from '../types';
+import type { AppMode, ToolType, JointSubType, CreateTool, JointMode, CameraState, SimDragState, GridLevel } from '../types';
 import type { Vec2 } from '../types';
 import { DEFAULT_GRID_SIZE } from '../utils/constants';
+
+const GRID_DIVISOR: Record<GridLevel, number> = {
+  normal: 1,
+  fine: 4,
+  ultrafine: 16,
+  off: 1,
+};
+
+function gridLevelToSize(level: GridLevel): number {
+  return DEFAULT_GRID_SIZE / GRID_DIVISOR[level];
+}
+
+const GRID_CYCLE: GridLevel[] = ['normal', 'fine', 'ultrafine', 'off'];
 
 interface EditorStore {
   mode: AppMode;
@@ -12,6 +25,7 @@ interface EditorStore {
   camera: CameraState;
   gridEnabled: boolean;
   gridSize: number;
+  gridLevel: GridLevel;
   linkStartJointId: string | null;
   simDrag: SimDragState | null;
   savedPositions: Record<string, Vec2> | null;
@@ -37,7 +51,8 @@ interface EditorStore {
   panCamera(delta: Vec2): void;
   zoomCamera(factor: number, center: Vec2): void;
   setLinkStart(id: string | null): void;
-  toggleGrid(): void;
+  cycleGrid(): void;
+  setGridLevel(level: GridLevel): void;
   setSimDrag(drag: SimDragState | null): void;
   setSavedPositions(positions: Record<string, Vec2> | null): void;
   toggleActiveBody(id: string): void;
@@ -63,6 +78,7 @@ export const useEditorStore = create<EditorStore>((set) => ({
   camera: { pan: { x: 0, y: 0 }, zoom: 1 },
   gridEnabled: true,
   gridSize: DEFAULT_GRID_SIZE,
+  gridLevel: 'normal' as GridLevel,
   linkStartJointId: null,
   simDrag: null,
   savedPositions: null,
@@ -140,8 +156,16 @@ export const useEditorStore = create<EditorStore>((set) => ({
     set({ linkStartJointId: id });
   },
 
-  toggleGrid() {
-    set((s) => ({ gridEnabled: !s.gridEnabled }));
+  cycleGrid() {
+    set((s) => {
+      const idx = GRID_CYCLE.indexOf(s.gridLevel);
+      const next = GRID_CYCLE[(idx + 1) % GRID_CYCLE.length];
+      return { gridLevel: next, gridEnabled: next !== 'off', gridSize: gridLevelToSize(next) };
+    });
+  },
+
+  setGridLevel(level) {
+    set({ gridLevel: level, gridEnabled: level !== 'off', gridSize: gridLevelToSize(level) });
   },
 
   setSimDrag(drag) {
