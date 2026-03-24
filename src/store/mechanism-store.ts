@@ -115,9 +115,16 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
   },
 
   addSlider(jointIdA, jointIdC, jointIdB) {
+    get().pushHistory();
     const id = createId();
     const slider: SliderConstraint = { id, jointIdA, jointIdB, jointIdC, t: 0.5 };
-    set((s) => ({ sliders: { ...s.sliders, [id]: slider } }));
+    const newSliders = { ...get().sliders, [id]: slider };
+    // Regenerate links to include A-C distance constraint
+    const { bodies, joints } = get();
+    const newLinks = buildLinksRecord(generateBodyLinks(bodies, joints, newSliders));
+    const newJoints = { ...joints };
+    updateJointConnections(newJoints, newLinks);
+    set({ sliders: newSliders, links: newLinks, joints: newJoints });
     return id;
   },
 
