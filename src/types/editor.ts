@@ -5,6 +5,7 @@ export type ToolType = 'select' | 'joint' | 'link' | 'pan';
 export type JointSubType = 'revolute' | 'fixed';
 export type CreateTool = 'joints' | 'slider' | 'outline' | 'image';
 export type JointMode = 'manual' | 'autochain';
+export type GridLevel = 'normal' | 'fine' | 'ultrafine' | 'off';
 
 export interface SimDragState {
   active: boolean;
@@ -30,6 +31,7 @@ export interface EditorState {
   camera: CameraState;
   gridEnabled: boolean;
   gridSize: number;
+  gridLevel: GridLevel;
   linkStartJointId: string | null;
   simDrag: SimDragState | null;
   savedPositions: Record<string, Vec2> | null;

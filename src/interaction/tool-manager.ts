@@ -590,7 +590,7 @@ export function handleKeyDown(e: KeyboardEvent) {
   if (editor.mode === 'simulate') {
     // Only allow grid toggle and undo/redo
     if (e.key === 'g' && !e.ctrlKey && !e.metaKey) {
-      editor.toggleGrid();
+      editor.cycleGrid();
       return;
     }
     if (e.key === 'Escape') {
@@ -607,7 +607,7 @@ export function handleKeyDown(e: KeyboardEvent) {
   // --- CREATE MODE shortcuts ---
   if (!e.ctrlKey && !e.metaKey) {
     switch (e.key) {
-      case 'g': editor.toggleGrid(); return;
+      case 'g': editor.cycleGrid(); return;
       case 'Escape':
         if (editor.sliderPointA) {
           // Cancel slider placement — remove the already-placed A joint
