@@ -4,23 +4,49 @@ import { distToSegment } from '../core/math/vec2';
 import { HIT_RADIUS, LINK_HIT_THRESHOLD } from '../utils/constants';
 import { computeBodyTransform, localToWorld } from '../core/body-transform';
 
+// Track last hit joint for click-cycling through overlapping joints
+let lastHitJointId: string | null = null;
+
 export function hitTestJoint(
   worldPos: Vec2,
   joints: Record<string, Joint>,
   zoom: number,
 ): Joint | null {
   const threshold = HIT_RADIUS / zoom;
-  let closest: Joint | null = null;
-  let closestDist = Infinity;
 
+  // Collect all joints within hit radius
+  const hits: { joint: Joint; dist: number }[] = [];
   for (const joint of Object.values(joints)) {
     const d = distance(worldPos, joint.position);
-    if (d < threshold && d < closestDist) {
-      closestDist = d;
-      closest = joint;
+    if (d < threshold) {
+      hits.push({ joint, dist: d });
     }
   }
-  return closest;
+
+  if (hits.length === 0) {
+    lastHitJointId = null;
+    return null;
+  }
+
+  // Sort by distance (closest first), then by id for stable order
+  hits.sort((a, b) => a.dist - b.dist || a.joint.id.localeCompare(b.joint.id));
+
+  // If only one hit or last hit not in the set, return closest
+  if (hits.length === 1 || !lastHitJointId) {
+    lastHitJointId = hits[0].joint.id;
+    return hits[0].joint;
+  }
+
+  // Find the last hit joint in the current hits and cycle to the next one
+  const lastIdx = hits.findIndex((h) => h.joint.id === lastHitJointId);
+  if (lastIdx === -1) {
+    lastHitJointId = hits[0].joint.id;
+    return hits[0].joint;
+  }
+
+  const nextIdx = (lastIdx + 1) % hits.length;
+  lastHitJointId = hits[nextIdx].joint.id;
+  return hits[nextIdx].joint;
 }
 
 export function hitTestLink(

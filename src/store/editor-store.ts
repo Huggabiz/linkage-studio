@@ -73,13 +73,13 @@ export const useEditorStore = create<EditorStore>((set) => ({
   jointMode: 'manual' as JointMode,
   autoChainLastBodyId: null as string | null,
   outlinePoints: [] as Vec2[],
-  lockOutlines: false,
+  lockOutlines: true,
   frozenOutlineWorldPoints: new Map(),
   imageDragMode: null,
   sliderPointA: null,
 
   setMode(mode) {
-    set({ mode, simDrag: null, linkStartJointId: null, selectedIds: new Set(), outlinePoints: [], createTool: 'joints' as CreateTool, jointMode: 'manual' as JointMode, autoChainLastBodyId: null, lockOutlines: false, frozenOutlineWorldPoints: new Map(), sliderPointA: null });
+    set({ mode, simDrag: null, linkStartJointId: null, selectedIds: new Set(), outlinePoints: [], createTool: 'joints' as CreateTool, jointMode: 'manual' as JointMode, autoChainLastBodyId: null, lockOutlines: true, frozenOutlineWorldPoints: new Map(), sliderPointA: null });
   },
 
   setTool(tool) {
