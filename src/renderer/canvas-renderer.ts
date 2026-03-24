@@ -4,7 +4,7 @@ import { applyCamera, resetCamera } from './camera';
 import { drawMechanism, drawOutlineGhost } from './draw-mechanism';
 import { drawGrid, drawPathTraces, drawForceVectors, drawDragInteraction, drawModeBadge, drawHUD, clearCanvas, drawCOMMarkers } from './draw-overlays';
 import { lerp } from '../core/math/vec2';
-import { computeBodyTransform, localToWorld, polygonCentroid } from '../core/body-transform';
+import { computeBodyTransform, localToWorld, polygonCentroid, polygonArea } from '../core/body-transform';
 
 export interface RenderState {
   joints: Record<string, Joint>;
@@ -59,7 +59,7 @@ export function render(
     drawForceVectors(ctx, state.forceVectors, state.camera.zoom);
   }
 
-  // Draw CoM markers for bodies with useOutlineCOM enabled
+  // Draw CoM markers for bodies with useOutlineCOM enabled (both modes)
   if (state.showVectors) {
     const comPositions: { pos: Vec2; color: string; gravityForce: Vec2 | null }[] = [];
     for (const body of Object.values(state.bodies)) {
@@ -69,9 +69,13 @@ export function render(
       const transform = computeBodyTransform(body, state.joints);
       const allWorldPts = bodyOutlines.flatMap((o) => o.points.map((p) => localToWorld(p, transform)));
       const com = polygonCentroid(allWorldPts);
-      const gravityForce = (state.mode === 'simulate' && state.gravityEnabled)
-        ? { x: 0, y: state.gravityStrength * 0.03 }
-        : null;
+      // Scale gravity vector by area-based mass (matching physics calculation)
+      let gravityForce: Vec2 | null = null;
+      if (state.gravityEnabled) {
+        const area = polygonArea(allWorldPts);
+        const massMult = Math.max(0.1, area / 1000);
+        gravityForce = { x: 0, y: state.gravityStrength * massMult * 0.005 };
+      }
       comPositions.push({ pos: com, color: body.color, gravityForce });
     }
     if (comPositions.length > 0) {

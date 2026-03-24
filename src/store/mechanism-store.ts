@@ -49,6 +49,9 @@ interface MechanismStore {
   removeOutline(id: string): void;
   toggleOutlineCOM(bodyId: string): void;
 
+  addTempJoint(position: Vec2, bodyId: string): string;
+  removeTempJoint(id: string): void;
+
   clearAll(): void;
   loadState(state: { joints: Record<string, Joint>; links: Record<string, Link>; bodies: Record<string, Body>; baseBodyId: string; outlines: Record<string, Outline> }): void;
   pushHistory(): void;
@@ -64,6 +67,38 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
   outlines: {},
   past: [],
   future: [],
+
+  addTempJoint(position, bodyId) {
+    const id = '__temp_' + createId();
+    const joint: Joint = { id, type: 'revolute', position, connectedLinkIds: [] };
+    const newJoints = { ...get().joints, [id]: joint };
+    const newBodies = { ...get().bodies };
+    const body = newBodies[bodyId];
+    if (body) {
+      newBodies[bodyId] = { ...body, jointIds: [...body.jointIds, id] };
+    }
+    // Regenerate links so the temp joint is constrained to the body
+    const newLinks = buildLinksRecord(generateBodyLinks(newBodies, newJoints));
+    updateJointConnections(newJoints, newLinks);
+    set({ joints: newJoints, links: newLinks, bodies: newBodies });
+    return id;
+  },
+
+  removeTempJoint(id) {
+    const newJoints = { ...get().joints };
+    const newBodies = { ...get().bodies };
+    // Remove from all bodies
+    for (const bodyId of Object.keys(newBodies)) {
+      const body = newBodies[bodyId];
+      if (body.jointIds.includes(id)) {
+        newBodies[bodyId] = { ...body, jointIds: body.jointIds.filter((jid) => jid !== id) };
+      }
+    }
+    delete newJoints[id];
+    const newLinks = buildLinksRecord(generateBodyLinks(newBodies, newJoints));
+    updateJointConnections(newJoints, newLinks);
+    set({ joints: newJoints, links: newLinks, bodies: newBodies });
+  },
 
   clearAll() {
     set({

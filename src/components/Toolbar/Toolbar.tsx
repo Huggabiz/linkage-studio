@@ -54,12 +54,22 @@ export function Toolbar() {
     clearSelection();
   };
 
+  const removeTempJoint = useMechanismStore((s) => s.removeTempJoint);
+
   const handleModeSwitch = (newMode: AppMode) => {
     if (newMode === mode) return;
+
+    // Clean up any temp joints from shape dragging
+    const editorState = useEditorStore.getState();
+    if (editorState.simDrag?.tempJointId) {
+      removeTempJoint(editorState.simDrag.tempJointId);
+      editorState.setSimDrag(null);
+    }
 
     if (newMode === 'simulate') {
       const positions: Record<string, Vec2> = {};
       for (const [id, joint] of Object.entries(joints)) {
+        if (id.startsWith('__temp_')) continue; // skip temp joints
         positions[id] = { ...joint.position };
       }
       setSavedPositions(positions);

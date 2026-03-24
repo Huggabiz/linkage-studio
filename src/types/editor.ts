@@ -13,6 +13,7 @@ export interface SimDragState {
   jointId: string;
   linkId: string | null;
   grabT: number;
+  tempJointId?: string;  // temporary joint created for shape dragging
 }
 
 export interface CameraState {
