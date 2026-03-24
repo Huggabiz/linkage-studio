@@ -118,6 +118,20 @@ src/
 
 Blue is excluded from the palette (reserved for selection highlight). Colors cycle through: red, green, orange, purple, teal, pink, brown, grey.
 
+## Deployment Checklist
+
+**Every time you complete an update, follow ALL steps in order:**
+
+1. `npx tsc --noEmit` — verify no type errors
+2. Increment version in `package.json` (patch for fixes, minor for features)
+3. `npx vite build` — production build (version is injected via Vite define)
+4. `git add` changed files, `git commit` with descriptive message
+5. `git push -u origin <branch>` — push to remote
+6. `npx gh-pages -d dist` — deploy to GitHub Pages
+7. Merge to master: `git checkout master && git merge <branch> && git push -u origin master && git checkout <branch>`
+
+**Do NOT skip the version bump — it appears in the app's top toolbar.**
+
 ## Deployment
 
 **Dev server:** `npm run dev`
