@@ -349,8 +349,11 @@ export function solveWithForce(
         if (isFreeJ) { predicted[idxJ!] -= cx; predicted[idxJ! + 1] -= cy; }
       }
 
-      // Slider constraints: B must lie on line AC.
-      // Bidirectional — if B is fixed, A and C are pushed so AC passes through B.
+      // Slider constraints: B must lie on segment AC (between A and C).
+      // Two sub-constraints enforced:
+      //   1. Perpendicular: B on the line through AC
+      //   2. Along-axis: B between A and C (0 ≤ t ≤ 1)
+      // Both are bidirectional — corrections distributed across free joints.
       for (const slider of sliderArray) {
         const idxA = jointIndex.get(slider.jointIdA);
         const idxB = jointIndex.get(slider.jointIdB);
@@ -365,71 +368,105 @@ export function solveWithForce(
         const freeC = idxC !== undefined;
 
         // Current predicted positions
-        const ax = freeA ? predicted[idxA!] : jA.position.x;
-        const ay = freeA ? predicted[idxA! + 1] : jA.position.y;
-        const bx = freeB ? predicted[idxB!] : jB.position.x;
-        const by = freeB ? predicted[idxB! + 1] : jB.position.y;
-        const cx2 = freeC ? predicted[idxC!] : jC.position.x;
-        const cy2 = freeC ? predicted[idxC! + 1] : jC.position.y;
+        let ax = freeA ? predicted[idxA!] : jA.position.x;
+        let ay = freeA ? predicted[idxA! + 1] : jA.position.y;
+        let bx = freeB ? predicted[idxB!] : jB.position.x;
+        let by = freeB ? predicted[idxB! + 1] : jB.position.y;
+        let cx2 = freeC ? predicted[idxC!] : jC.position.x;
+        let cy2 = freeC ? predicted[idxC! + 1] : jC.position.y;
 
         // Direction along AC
-        const acx = cx2 - ax;
-        const acy = cy2 - ay;
-        const acLenSq = acx * acx + acy * acy;
+        let acx = cx2 - ax;
+        let acy = cy2 - ay;
+        let acLenSq = acx * acx + acy * acy;
         if (acLenSq < 1e-8) continue;
-        const acLen = Math.sqrt(acLenSq);
+        let acLen = Math.sqrt(acLenSq);
 
         // Unit vectors: along AC and perpendicular
-        const ux = acx / acLen;
-        const uy = acy / acLen;
+        let ux = acx / acLen;
+        let uy = acy / acLen;
         const perpX = -uy;
         const perpY = ux;
 
-        // B's offset from line AC (perpendicular distance, signed)
-        const abx = bx - ax;
-        const aby = by - ay;
+        // B's position relative to A in (along, perp) coordinates
+        let abx = bx - ax;
+        let aby = by - ay;
         const perpDist = abx * perpX + aby * perpY;
+        const alongDist = abx * ux + aby * uy;
+        const tParam = alongDist / acLen; // B's parametric position (unclamped)
 
-        // If perpDist ≈ 0, B is already on the line
-        if (Math.abs(perpDist) < 1e-10) {
-          // Still project B to clamp within segment
-          if (freeB) {
-            const tParam = Math.max(0, Math.min(1, (abx * ux + aby * uy) / acLen));
-            predicted[idxB!] = ax + acx * tParam;
-            predicted[idxB! + 1] = ay + acy * tParam;
+        // --- Sub-constraint 1: Perpendicular correction ---
+        if (Math.abs(perpDist) > 1e-10) {
+          const wB = freeB ? 1 : 0;
+          const wAC = (freeA ? 1 : 0) + (freeC ? 1 : 0);
+          const totalW = wB + wAC;
+          if (totalW > 0) {
+            // B moves toward line, A&C move away from B (perpendicular)
+            const bShare = totalW > 0 ? (wAC > 0 ? wAC / totalW : 1) : 0;
+            const acShare = wAC > 0 && wB > 0 ? (wB / totalW) / wAC : 0;
+
+            if (freeB) {
+              bx -= perpX * perpDist * bShare;
+              by -= perpY * perpDist * bShare;
+              predicted[idxB!] = bx;
+              predicted[idxB! + 1] = by;
+            }
+            if (freeA) {
+              ax += perpX * perpDist * acShare;
+              ay += perpY * perpDist * acShare;
+              predicted[idxA!] = ax;
+              predicted[idxA! + 1] = ay;
+            }
+            if (freeC) {
+              cx2 += perpX * perpDist * acShare;
+              cy2 += perpY * perpDist * acShare;
+              predicted[idxC!] = cx2;
+              predicted[idxC! + 1] = cy2;
+            }
           }
-          continue;
         }
 
-        // Count free participants to distribute the correction
-        const wB = freeB ? 1 : 0;
-        const wAC = (freeA ? 1 : 0) + (freeC ? 1 : 0);
-        const totalW = wB + wAC;
-        if (totalW === 0) continue;
+        // --- Sub-constraint 2: Along-axis clamping (B between A and C) ---
+        // Recompute AC direction after perpendicular correction
+        acx = cx2 - ax;
+        acy = cy2 - ay;
+        acLenSq = acx * acx + acy * acy;
+        if (acLenSq < 1e-8) continue;
+        acLen = Math.sqrt(acLenSq);
+        ux = acx / acLen;
+        uy = acy / acLen;
 
-        // Correction: move B toward line, move A&C away from B (perpendicular)
-        // B gets corrected by -perpDist * (wAC / totalW) toward line
-        // A and C each get pushed by +perpDist * (wB / totalW) / numFreeAC in perp direction
-        const bCorrection = perpDist * (wAC > 0 ? (wAC / totalW) : (totalW > 0 ? 1 : 0));
-        const acCorrection = wAC > 0 ? perpDist * (wB > 0 ? (wB / totalW) : (totalW > 0 ? 1 : 0)) / wAC : 0;
+        abx = bx - ax;
+        aby = by - ay;
+        const tCorrected = (abx * ux + aby * uy) / acLen;
 
-        if (freeB) {
-          // Move B onto line, then clamp to segment
-          const newBx = bx - perpX * bCorrection;
-          const newBy = by - perpY * bCorrection;
-          const nbx = newBx - ax;
-          const nby = newBy - ay;
-          const tParam = Math.max(0, Math.min(1, (nbx * ux + nby * uy) / acLen));
-          predicted[idxB!] = ax + acx * tParam;
-          predicted[idxB! + 1] = ay + acy * tParam;
-        }
-        if (freeA) {
-          predicted[idxA!] += perpX * acCorrection;
-          predicted[idxA! + 1] += perpY * acCorrection;
-        }
-        if (freeC) {
-          predicted[idxC!] += perpX * acCorrection;
-          predicted[idxC! + 1] += perpY * acCorrection;
+        if (tCorrected < 0) {
+          // B is past A — need to push A back (or pull B forward)
+          const overshoot = -tCorrected * acLen; // positive distance B is past A
+          if (freeB && freeA) {
+            // Split correction
+            if (freeB) { predicted[idxB!] += ux * (overshoot / 2); predicted[idxB! + 1] += uy * (overshoot / 2); }
+            if (freeA) { predicted[idxA!] -= ux * (overshoot / 2); predicted[idxA! + 1] -= uy * (overshoot / 2); }
+          } else if (freeB) {
+            predicted[idxB!] += ux * overshoot;
+            predicted[idxB! + 1] += uy * overshoot;
+          } else if (freeA) {
+            predicted[idxA!] -= ux * overshoot;
+            predicted[idxA! + 1] -= uy * overshoot;
+          }
+        } else if (tCorrected > 1) {
+          // B is past C — need to push C forward (or pull B back)
+          const overshoot = (tCorrected - 1) * acLen;
+          if (freeB && freeC) {
+            if (freeB) { predicted[idxB!] -= ux * (overshoot / 2); predicted[idxB! + 1] -= uy * (overshoot / 2); }
+            if (freeC) { predicted[idxC!] += ux * (overshoot / 2); predicted[idxC! + 1] += uy * (overshoot / 2); }
+          } else if (freeB) {
+            predicted[idxB!] -= ux * overshoot;
+            predicted[idxB! + 1] -= uy * overshoot;
+          } else if (freeC) {
+            predicted[idxC!] += ux * overshoot;
+            predicted[idxC! + 1] += uy * overshoot;
+          }
         }
       }
     }
