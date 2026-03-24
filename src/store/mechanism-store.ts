@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Joint, Link, Body, Outline, JointType } from '../types';
+import type { Joint, Link, Body, Outline, CanvasImage, JointType } from '../types';
 import type { Vec2 } from '../types';
 import { createId } from '../utils/id';
 import { generateBodyLinks } from '../core/body-links';
@@ -12,6 +12,7 @@ interface HistorySnapshot {
   bodies: Record<string, Body>;
   baseBodyId: string;
   outlines: Record<string, Outline>;
+  images: Record<string, CanvasImage>;
 }
 
 const BASE_BODY_ID = 'base';
@@ -26,6 +27,7 @@ interface MechanismStore {
   bodies: Record<string, Body>;
   baseBodyId: string;
   outlines: Record<string, Outline>;
+  images: Record<string, CanvasImage>;
 
   past: HistorySnapshot[];
   future: HistorySnapshot[];
@@ -49,12 +51,16 @@ interface MechanismStore {
   removeOutline(id: string): void;
   toggleOutlineCOM(bodyId: string): void;
 
+  addImage(bodyId: string, src: string, naturalWidth: number, naturalHeight: number, position: Vec2): string;
+  removeImage(id: string): void;
+  updateImage(id: string, updates: Partial<Pick<CanvasImage, 'position' | 'scale' | 'rotation' | 'opacity' | 'visible'>>): void;
+
   addTempJoint(position: Vec2, bodyId: string): string;
   removeTempJoint(id: string): void;
   reprojectOutlinesFromWorld(frozenWorldPoints: Map<string, Vec2[]>): void;
 
   clearAll(): void;
-  loadState(state: { joints: Record<string, Joint>; links: Record<string, Link>; bodies: Record<string, Body>; baseBodyId: string; outlines: Record<string, Outline> }): void;
+  loadState(state: { joints: Record<string, Joint>; links: Record<string, Link>; bodies: Record<string, Body>; baseBodyId: string; outlines: Record<string, Outline>; images?: Record<string, CanvasImage> }): void;
   pushHistory(): void;
   undo(): void;
   redo(): void;
@@ -66,8 +72,38 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
   bodies: { [BASE_BODY_ID]: createBaseBody() },
   baseBodyId: BASE_BODY_ID,
   outlines: {},
+  images: {},
   past: [],
   future: [],
+
+  addImage(bodyId, src, naturalWidth, naturalHeight, position) {
+    const id = createId();
+    get().pushHistory();
+    const image: CanvasImage = {
+      id, bodyId, src, position,
+      scale: 1, rotation: 0, opacity: 0.5, visible: true,
+      naturalWidth, naturalHeight,
+    };
+    set((s) => ({ images: { ...s.images, [id]: image } }));
+    return id;
+  },
+
+  removeImage(id) {
+    get().pushHistory();
+    set((s) => {
+      const newImages = { ...s.images };
+      delete newImages[id];
+      return { images: newImages };
+    });
+  },
+
+  updateImage(id, updates) {
+    set((s) => {
+      const img = s.images[id];
+      if (!img) return s;
+      return { images: { ...s.images, [id]: { ...img, ...updates } } };
+    });
+  },
 
   addTempJoint(position, bodyId) {
     const id = '__temp_' + createId();
@@ -124,6 +160,7 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
       bodies: { [BASE_BODY_ID]: createBaseBody() },
       baseBodyId: BASE_BODY_ID,
       outlines: {},
+      images: {},
       past: [],
       future: [],
     });
@@ -136,21 +173,22 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
       bodies: state.bodies,
       baseBodyId: state.baseBodyId,
       outlines: state.outlines,
+      images: state.images || {},
       past: [],
       future: [],
     });
   },
 
   pushHistory() {
-    const { joints, links, bodies, baseBodyId, outlines, past } = get();
+    const { joints, links, bodies, baseBodyId, outlines, images, past } = get();
     set({
-      past: [...past.slice(-50), { joints: { ...joints }, links: { ...links }, bodies: { ...bodies }, baseBodyId, outlines: { ...outlines } }],
+      past: [...past.slice(-50), { joints: { ...joints }, links: { ...links }, bodies: { ...bodies }, baseBodyId, outlines: { ...outlines }, images: { ...images } }],
       future: [],
     });
   },
 
   undo() {
-    const { past, joints, links, bodies, baseBodyId, outlines } = get();
+    const { past, joints, links, bodies, baseBodyId, outlines, images } = get();
     if (past.length === 0) return;
     const prev = past[past.length - 1];
     set({
@@ -159,13 +197,14 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
       bodies: prev.bodies,
       baseBodyId: prev.baseBodyId,
       outlines: prev.outlines,
+      images: prev.images || {},
       past: past.slice(0, -1),
-      future: [{ joints: { ...joints }, links: { ...links }, bodies: { ...bodies }, baseBodyId, outlines: { ...outlines } }, ...get().future],
+      future: [{ joints: { ...joints }, links: { ...links }, bodies: { ...bodies }, baseBodyId, outlines: { ...outlines }, images: { ...images } }, ...get().future],
     });
   },
 
   redo() {
-    const { future, joints, links, bodies, baseBodyId, outlines } = get();
+    const { future, joints, links, bodies, baseBodyId, outlines, images } = get();
     if (future.length === 0) return;
     const next = future[0];
     set({
@@ -174,8 +213,9 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
       bodies: next.bodies,
       baseBodyId: next.baseBodyId,
       outlines: next.outlines,
+      images: next.images || {},
       future: future.slice(1),
-      past: [...get().past, { joints: { ...joints }, links: { ...links }, bodies: { ...bodies }, baseBodyId, outlines: { ...outlines } }],
+      past: [...get().past, { joints: { ...joints }, links: { ...links }, bodies: { ...bodies }, baseBodyId, outlines: { ...outlines }, images: { ...images } }],
     });
   },
 

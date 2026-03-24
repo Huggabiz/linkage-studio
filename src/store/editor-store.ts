@@ -24,6 +24,7 @@ interface EditorStore {
   outlinePoints: Vec2[];
   lockOutlines: boolean;
   frozenOutlineWorldPoints: Map<string, Vec2[]>;
+  imageDragMode: 'move' | 'rotate' | 'scale' | null;
 
   setMode(mode: AppMode): void;
   setTool(tool: ToolType): void;
@@ -48,6 +49,7 @@ interface EditorStore {
   addOutlinePoint(pt: Vec2): void;
   clearOutlinePoints(): void;
   setLockOutlines(locked: boolean, frozenPoints?: Map<string, Vec2[]>): void;
+  setImageDragMode(mode: 'move' | 'rotate' | 'scale' | null): void;
 }
 
 export const useEditorStore = create<EditorStore>((set) => ({
@@ -71,6 +73,7 @@ export const useEditorStore = create<EditorStore>((set) => ({
   outlinePoints: [] as Vec2[],
   lockOutlines: false,
   frozenOutlineWorldPoints: new Map(),
+  imageDragMode: null,
 
   setMode(mode) {
     set({ mode, simDrag: null, linkStartJointId: null, selectedIds: new Set(), outlinePoints: [], createTool: 'joints' as CreateTool, jointMode: 'manual' as JointMode, autoChainLastBodyId: null, lockOutlines: false, frozenOutlineWorldPoints: new Map() });
@@ -193,5 +196,9 @@ export const useEditorStore = create<EditorStore>((set) => ({
     } else {
       set({ lockOutlines: false, frozenOutlineWorldPoints: new Map() });
     }
+  },
+
+  setImageDragMode(mode) {
+    set({ imageDragMode: mode });
   },
 }));
