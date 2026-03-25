@@ -6,6 +6,47 @@ import { screenToWorld } from '../../renderer/camera';
 import { computeBodyTransform, localToWorld } from '../../core/body-transform';
 import './Toolbar.css';
 
+/* Inline SVG tool icons (16×16 viewBox) */
+const IconPivot = () => (
+  <svg className="tool-icon-svg" viewBox="0 0 16 16" width="16" height="16">
+    <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeWidth="1.5" />
+    <circle cx="8" cy="8" r="2" fill="currentColor" />
+  </svg>
+);
+
+const IconAutoChain = () => (
+  <svg className="tool-icon-svg" viewBox="0 0 16 16" width="16" height="16">
+    <circle cx="3" cy="8" r="2" fill="currentColor" />
+    <circle cx="13" cy="4" r="2" fill="currentColor" />
+    <circle cx="13" cy="12" r="2" fill="currentColor" />
+    <line x1="3" y1="8" x2="13" y2="4" stroke="currentColor" strokeWidth="1.2" />
+    <line x1="3" y1="8" x2="13" y2="12" stroke="currentColor" strokeWidth="1.2" />
+  </svg>
+);
+
+const IconSlider = () => (
+  <svg className="tool-icon-svg" viewBox="0 0 16 16" width="16" height="16">
+    <line x1="2" y1="8" x2="14" y2="8" stroke="currentColor" strokeWidth="1.5" />
+    <circle cx="3" cy="8" r="2" fill="none" stroke="currentColor" strokeWidth="1.2" />
+    <circle cx="13" cy="8" r="2" fill="none" stroke="currentColor" strokeWidth="1.2" />
+    <rect x="6" y="5" width="4" height="6" rx="1" fill="currentColor" opacity="0.6" />
+  </svg>
+);
+
+const IconOutline = () => (
+  <svg className="tool-icon-svg" viewBox="0 0 16 16" width="16" height="16">
+    <polygon points="8,1 14,5 12,13 4,13 2,5" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+  </svg>
+);
+
+const IconImage = () => (
+  <svg className="tool-icon-svg" viewBox="0 0 16 16" width="16" height="16">
+    <rect x="1.5" y="2.5" width="13" height="11" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.2" />
+    <circle cx="5" cy="6" r="1.5" fill="currentColor" />
+    <polyline points="1.5,11 5,8 8,10 11,6 14.5,9.5" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+  </svg>
+);
+
 export function Toolbar() {
   const mode = useEditorStore((s) => s.mode);
   const createTool = useEditorStore((s) => s.createTool);
@@ -214,52 +255,47 @@ export function Toolbar() {
           <div className="toolbar-section">
             <div className="toolbar-label">Tools</div>
 
-            {/* Joints group header */}
-            <div className="toolbar-label" style={{ fontSize: 9, padding: '6px 8px 1px', color: '#666' }}>Joints</div>
+            {/* Joints group */}
+            <div className="toolbar-group-label">Joints</div>
 
-            {/* Pivot */}
             <button
-              className={`tool-btn sub ${isPivotTool ? 'active' : ''}`}
-              onClick={() => setCreateTool('joints')}
-              style={{ paddingLeft: 16 }}
+              className={`tool-btn ${isPivotTool ? 'active' : ''}`}
+              onClick={() => { setCreateTool('joints'); if (jointMode === 'autochain') setJointMode('manual'); }}
             >
-              Pivot
+              <IconPivot />
+              <span className="tool-name">Pivot</span>
             </button>
             {isPivotTool && (
-              <div className="sub-tools" style={{ paddingLeft: 24 }}>
-                <button
-                  className={`tool-btn sub ${jointMode === 'manual' ? 'active' : ''}`}
-                  onClick={() => setJointMode('manual')}
-                >
-                  Manual
-                </button>
+              <div className="sub-tools">
                 <button
                   className={`tool-btn sub ${jointMode === 'autochain' ? 'active' : ''}`}
-                  onClick={() => setJointMode('autochain')}
+                  onClick={() => setJointMode(jointMode === 'autochain' ? 'manual' : 'autochain')}
                 >
-                  Auto Chain
+                  <IconAutoChain />
+                  <span className="tool-name">Auto Chain</span>
                 </button>
               </div>
             )}
 
-            {/* Slider */}
             <button
-              className={`tool-btn sub ${isSliderTool ? 'active' : ''}`}
+              className={`tool-btn ${isSliderTool ? 'active' : ''}`}
               onClick={() => setCreateTool('slider')}
-              style={{ paddingLeft: 16 }}
             >
-              Slider
+              <IconSlider />
+              <span className="tool-name">Slider</span>
             </button>
 
-            {/* Outline */}
+            {/* Shapes group */}
+            <div className="toolbar-group-label">Shapes</div>
+
             <button
               className={`tool-btn ${createTool === 'outline' ? 'active' : ''}`}
               onClick={() => setCreateTool('outline')}
             >
-              Outline
+              <IconOutline />
+              <span className="tool-name">Outline</span>
             </button>
 
-            {/* Image */}
             <button
               className={`tool-btn ${createTool === 'image' ? 'active' : ''}`}
               onClick={() => {
@@ -272,7 +308,8 @@ export function Toolbar() {
                 }
               }}
             >
-              Image
+              <IconImage />
+              <span className="tool-name">Image</span>
             </button>
           </div>
 

@@ -68,8 +68,22 @@
   text-align: center;
 }
 
+.tool-icon-svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
 .tool-name {
   flex: 1;
+}
+
+.toolbar-group-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  color: #666;
+  padding: 6px 8px 1px;
+  letter-spacing: 0.5px;
 }
 
 .mode-toggle {
