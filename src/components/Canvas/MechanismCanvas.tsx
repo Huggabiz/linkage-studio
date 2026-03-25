@@ -9,6 +9,7 @@ import {
 } from '../../interaction/tool-manager';
 import { hitTestAny, hitTestOutlineFilled } from '../../interaction/hit-test';
 import { hitTestImage, hitTestRotateHandle, hitTestScaleHandle } from '../../renderer/draw-images';
+import { computeBodyTransform, localToWorld } from '../../core/body-transform';
 import type { Vec2 } from '../../types';
 
 // --- Touch gesture state (module-level, survives re-renders) ---
@@ -96,6 +97,29 @@ export function MechanismCanvas() {
     rafRef.current = requestAnimationFrame(renderLoop);
     return () => cancelAnimationFrame(rafRef.current);
   }, [renderLoop]);
+
+  // On mount, if lockOutlines is true but frozenOutlineWorldPoints is empty,
+  // populate it from current outline positions. Fixes the bug where the
+  // checkbox starts checked but has no frozen data to actually lock to.
+  useEffect(() => {
+    const editor = useEditorStore.getState();
+    if (editor.lockOutlines && editor.frozenOutlineWorldPoints.size === 0) {
+      const mech = useMechanismStore.getState();
+      const outlineValues = Object.values(mech.outlines);
+      if (outlineValues.length > 0) {
+        const frozen = new Map<string, Vec2[]>();
+        for (const outline of outlineValues) {
+          const body = mech.bodies[outline.bodyId];
+          if (!body || outline.points.length < 2) continue;
+          const transform = computeBodyTransform(body, mech.joints);
+          frozen.set(outline.id, outline.points.map((p) => localToWorld(p, transform)));
+        }
+        if (frozen.size > 0) {
+          editor.setLockOutlines(true, frozen);
+        }
+      }
+    }
+  }, []);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => handleKeyDown(e);
