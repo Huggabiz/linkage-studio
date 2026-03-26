@@ -3,7 +3,7 @@ import type { CameraState } from '../types';
 import { applyCamera, resetCamera } from './camera';
 import { drawMechanism, drawOutlineGhost, drawSliderGhost, drawOutlineEditMode } from './draw-mechanism';
 import { drawImages } from './draw-images';
-import { drawGrid, drawPathTraces, drawForceVectors, drawDragInteraction, drawModeBadge, drawHUD, clearCanvas, drawCOMMarkers } from './draw-overlays';
+import { drawGrid, drawRulers, drawPathTraces, drawForceVectors, drawDragInteraction, drawModeBadge, drawHUD, clearCanvas, drawCOMMarkers } from './draw-overlays';
 import { lerp } from '../core/math/vec2';
 import { computeBodyTransform, localToWorld, polygonCentroid, polygonArea } from '../core/body-transform';
 
@@ -27,6 +27,8 @@ export interface RenderState {
   forceVectors: ForceVector[];
   showLinks: boolean;
   showVectors: boolean;
+  showRulers: boolean;
+  showForceUnits: boolean;
   createTool: CreateTool;
   outlinePoints: Vec2[];
   activeBodyColor: string;
@@ -52,6 +54,10 @@ export function render(
 
   if (state.gridEnabled) {
     drawGrid(ctx, state.camera, w, h, state.gridSize);
+  }
+
+  if (state.showRulers) {
+    drawRulers(ctx, state.camera, w, h);
   }
 
   // Draw images behind mechanism
@@ -91,7 +97,7 @@ export function render(
   }
 
   if (state.mode === 'simulate' && state.forceVectors.length > 0 && state.showVectors) {
-    drawForceVectors(ctx, state.forceVectors, state.camera.zoom);
+    drawForceVectors(ctx, state.forceVectors, state.camera.zoom, state.showForceUnits);
   }
 
   // Draw CoM markers for bodies with useOutlineCOM enabled (both modes)

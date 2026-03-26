@@ -662,9 +662,14 @@ function buildLinksRecord(links: Link[]): Record<string, Link> {
   return record;
 }
 
-/** Generate links + angle constraints from body structure. */
+/** Generate links + bracing joints from body structure. */
 function regenConstraints(bodies: Record<string, Body>, joints: Record<string, Joint>, sliders: Record<string, SliderConstraint>) {
-  const { links, angleConstraints } = generateBodyLinks(bodies, joints, sliders);
+  // Remove old bracing joints before regenerating
+  for (const id of Object.keys(joints)) {
+    if (id.startsWith('__brace_')) delete joints[id];
+  }
+  const { links, angleConstraints, bracingJoints } = generateBodyLinks(bodies, joints, sliders);
+  // bracingJoints are already added to the joints record by generateBodyLinks
   return { newLinks: buildLinksRecord(links), angleConstraints };
 }
 

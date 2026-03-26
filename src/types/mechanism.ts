@@ -9,6 +9,8 @@ export interface Joint {
   connectedLinkIds: string[];
   mass?: number;
   externalForce?: Vec2;
+  /** Hidden bracing joints are invisible to the user but participate in physics */
+  hidden?: boolean;
 }
 
 export interface Link {

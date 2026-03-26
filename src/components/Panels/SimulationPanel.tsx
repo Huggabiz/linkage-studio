@@ -9,15 +9,15 @@ export function SimulationPanel() {
   const speed = useSimulationStore((s) => s.speed);
   const dof = useSimulationStore((s) => s.dof);
   const time = useSimulationStore((s) => s.time);
-  const driverJointId = useSimulationStore((s) => s.driverJointId);
+  // const driverJointId = useSimulationStore((s) => s.driverJointId);
   const gravityEnabled = useSimulationStore((s) => s.gravityEnabled);
   const gravityStrength = useSimulationStore((s) => s.gravityStrength);
   const play = useSimulationStore((s) => s.play);
   const pause = useSimulationStore((s) => s.pause);
   const reset = useSimulationStore((s) => s.reset);
   const setSpeed = useSimulationStore((s) => s.setSpeed);
-  const setDriver = useSimulationStore((s) => s.setDriver);
-  const clearDriver = useSimulationStore((s) => s.clearDriver);
+  // const setDriver = useSimulationStore((s) => s.setDriver);
+  // const clearDriver = useSimulationStore((s) => s.clearDriver);
   const clearTraces = useSimulationStore((s) => s.clearTraces);
   const toggleGravity = useSimulationStore((s) => s.toggleGravity);
   const setGravityStrength = useSimulationStore((s) => s.setGravityStrength);
@@ -29,11 +29,11 @@ export function SimulationPanel() {
   const setDragDamping = useSimulationStore((s) => s.setDragDamping);
 
   const joints = useMechanismStore((s) => s.joints);
-  const links = useMechanismStore((s) => s.links);
-  const selectedIds = useEditorStore((s) => s.selectedIds);
 
   const showLinks = useEditorStore((s) => s.showLinks);
   const showVectors = useEditorStore((s) => s.showVectors);
+  const showRulers = useEditorStore((s) => s.showRulers);
+  const showForceUnits = useEditorStore((s) => s.showForceUnits);
   const lockOutlines = useEditorStore((s) => s.lockOutlines);
   const gridLevel = useEditorStore((s) => s.gridLevel);
 
@@ -120,6 +120,22 @@ export function SimulationPanel() {
           onChange={() => useEditorStore.getState().toggleShowVectors()}
         />
         Show vectors
+      </label>
+      <label style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <input
+          type="checkbox"
+          checked={showRulers}
+          onChange={() => useEditorStore.getState().toggleShowRulers()}
+        />
+        Show rulers
+      </label>
+      <label style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <input
+          type="checkbox"
+          checked={showForceUnits}
+          onChange={() => useEditorStore.getState().toggleShowForceUnits()}
+        />
+        Show force units
       </label>
       {mode === 'create' && (
         <label style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -209,17 +225,6 @@ export function SimulationPanel() {
   }
 
   // --- CREATE MODE ---
-  const selectedJointId = [...selectedIds].find((id) => joints[id]);
-  const selectedJoint = selectedJointId ? joints[selectedJointId] : null;
-
-  const canSetDriver = selectedJoint && selectedJoint.type !== 'fixed' &&
-    selectedJoint.connectedLinkIds.some((linkId) => {
-      const link = links[linkId];
-      if (!link) return false;
-      const otherJointId = link.jointIds[0] === selectedJointId ? link.jointIds[1] : link.jointIds[0];
-      return joints[otherJointId]?.type === 'fixed';
-    });
-
   return (
     <div className="panel-content">
       <div className="panel-title">Simulation</div>
@@ -247,29 +252,6 @@ export function SimulationPanel() {
       </label>
 
       {physicsSection}
-
-      <div className="panel-title" style={{ marginTop: 8 }}>Driver</div>
-      {driverJointId ? (
-        <div>
-          <div className="panel-info">Joint: {driverJointId.slice(0, 6)}...</div>
-          <button className="tool-btn" onClick={clearDriver}>Remove Driver</button>
-        </div>
-      ) : canSetDriver && selectedJointId ? (
-        <button
-          className="tool-btn"
-          onClick={() => {
-            const link = Object.values(links).find((l) =>
-              l.jointIds.includes(selectedJointId) &&
-              l.jointIds.some((jid) => jid !== selectedJointId && joints[jid]?.type === 'fixed')
-            );
-            if (link) setDriver(selectedJointId, link.id, 'motor');
-          }}
-        >
-          Set Selected as Motor
-        </button>
-      ) : (
-        <div className="panel-info">Select a joint connected to ground to set a driver</div>
-      )}
 
       {viewSection}
     </div>

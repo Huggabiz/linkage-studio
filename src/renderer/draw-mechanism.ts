@@ -219,6 +219,8 @@ export function drawMechanism(
       if (!owningBody && baseJointIds.has(idA) && baseJointIds.has(idB)) continue;
       // Skip if the owning body has links hidden
       if (owningBody && !owningBody.showLinks) continue;
+      // Skip links involving hidden bracing joints
+      if (joints[idA]?.hidden || joints[idB]?.hidden) continue;
       drawLink(ctx, link, joints, zoom, linkColors.get(link.id) || '#666666');
     }
   }
@@ -229,8 +231,9 @@ export function drawMechanism(
   // Draw outlines (use frozen points if outlines are locked)
   drawOutlines(ctx, Object.values(outlines), bodies, joints, zoom, selectedIds, frozenOutlinePoints);
 
-  // Draw joints with body rings
+  // Draw joints with body rings (skip hidden bracing joints)
   for (const joint of Object.values(joints)) {
+    if (joint.hidden) continue;
     const memberBodies = jointBodies.get(joint.id) || [];
     drawJoint(ctx, joint, selectedIds.has(joint.id), hoveredId === joint.id, zoom, memberBodies);
   }

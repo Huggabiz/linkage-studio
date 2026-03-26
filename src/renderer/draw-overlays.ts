@@ -54,6 +54,117 @@ export function drawGrid(
   ctx.stroke();
 }
 
+/**
+ * Draw ruler tick marks and dimension labels along the x=0 and y=0 axes.
+ * Uses cm/mm units where 1cm = DEFAULT_GRID_SIZE (25px).
+ * Adaptively shows finer graduations as zoom increases.
+ */
+export function drawRulers(
+  ctx: CanvasRenderingContext2D,
+  camera: CameraState,
+  canvasWidth: number,
+  canvasHeight: number,
+) {
+  const { pan, zoom } = camera;
+  const PX_PER_CM = 25; // 1cm = 25 world units
+
+  // Visible world bounds
+  const left = -pan.x / zoom;
+  const top = -pan.y / zoom;
+  const right = (canvasWidth - pan.x) / zoom;
+  const bottom = (canvasHeight - pan.y) / zoom;
+
+  // Determine tick spacing based on zoom level
+  // We want at least ~40px screen-space between major ticks
+  // and ~8px between minor ticks
+  const cmScreenPx = PX_PER_CM * zoom; // how many screen pixels per cm
+
+  // Choose major unit: 1mm, 2mm, 5mm, 1cm, 2cm, 5cm, 10cm, 20cm, 50cm, 1m...
+  const steps = [0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000];
+  let majorCm = 1;
+  for (const s of steps) {
+    if (s * cmScreenPx >= 40) { majorCm = s; break; }
+  }
+  // Minor ticks: subdivide major by 5 or 10
+  const minorCm = majorCm / 5;
+  const minorScreenPx = minorCm * cmScreenPx;
+
+  const majorTickLen = 8 / zoom;
+  const minorTickLen = 4 / zoom;
+
+  ctx.textBaseline = 'top';
+  ctx.textAlign = 'center';
+
+  // --- Horizontal ruler (along y=0 axis) ---
+  const xStartCm = Math.floor((left / PX_PER_CM) / minorCm) * minorCm;
+  const xEndCm = Math.ceil((right / PX_PER_CM) / minorCm) * minorCm;
+
+  for (let cm = xStartCm; cm <= xEndCm; cm += minorCm) {
+    const worldX = cm * PX_PER_CM;
+    if (worldX === 0) continue; // skip origin
+    const isMajor = Math.abs(cm - Math.round(cm / majorCm) * majorCm) < minorCm * 0.1;
+    const tickLen = isMajor ? majorTickLen : minorTickLen;
+
+    ctx.beginPath();
+    ctx.moveTo(worldX, -tickLen);
+    ctx.lineTo(worldX, tickLen);
+    ctx.strokeStyle = isMajor ? '#999' : '#bbb';
+    ctx.lineWidth = (isMajor ? 1.2 : 0.8) / zoom;
+    ctx.stroke();
+
+    // Label major ticks
+    if (isMajor && minorScreenPx > 2) {
+      const label = formatRulerLabel(cm);
+      ctx.font = `${9 / zoom}px monospace`;
+      ctx.fillStyle = '#888';
+      ctx.fillText(label, worldX, tickLen + 2 / zoom);
+    }
+  }
+
+  // --- Vertical ruler (along x=0 axis) ---
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'left';
+
+  const yStartCm = Math.floor((top / PX_PER_CM) / minorCm) * minorCm;
+  const yEndCm = Math.ceil((bottom / PX_PER_CM) / minorCm) * minorCm;
+
+  for (let cm = yStartCm; cm <= yEndCm; cm += minorCm) {
+    const worldY = cm * PX_PER_CM;
+    if (worldY === 0) continue;
+    const isMajor = Math.abs(cm - Math.round(cm / majorCm) * majorCm) < minorCm * 0.1;
+    const tickLen = isMajor ? majorTickLen : minorTickLen;
+
+    ctx.beginPath();
+    ctx.moveTo(-tickLen, worldY);
+    ctx.lineTo(tickLen, worldY);
+    ctx.strokeStyle = isMajor ? '#999' : '#bbb';
+    ctx.lineWidth = (isMajor ? 1.2 : 0.8) / zoom;
+    ctx.stroke();
+
+    if (isMajor && minorScreenPx > 2) {
+      const label = formatRulerLabel(cm);
+      ctx.font = `${9 / zoom}px monospace`;
+      ctx.fillStyle = '#888';
+      ctx.fillText(label, tickLen + 2 / zoom, worldY);
+    }
+  }
+
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+}
+
+function formatRulerLabel(cm: number): string {
+  const absCm = Math.abs(cm);
+  if (absCm >= 100) {
+    const m = cm / 100;
+    return Number.isInteger(m) ? `${m}m` : `${m.toFixed(1)}m`;
+  }
+  if (absCm >= 1) {
+    return Number.isInteger(cm) ? `${cm}cm` : `${cm.toFixed(1)}cm`;
+  }
+  return `${(cm * 10).toFixed(0)}mm`;
+}
+
 export function drawPathTraces(
   ctx: CanvasRenderingContext2D,
   traces: Map<string, Vec2[]>,
@@ -160,6 +271,7 @@ export function drawForceVectors(
   ctx: CanvasRenderingContext2D,
   vectors: ForceVector[],
   zoom: number,
+  showForceUnits: boolean = false,
 ) {
   for (const v of vectors) {
     const toX = v.origin.x + v.force.x;
@@ -172,6 +284,27 @@ export function drawForceVectors(
     ctx.arc(v.origin.x, v.origin.y, 3 / zoom, 0, Math.PI * 2);
     ctx.fillStyle = v.color;
     ctx.fill();
+
+    // Force magnitude label
+    if (showForceUnits) {
+      const mag = Math.sqrt(v.force.x * v.force.x + v.force.y * v.force.y);
+      if (mag > 0.1) {
+        const label = mag >= 1000 ? `${(mag / 1000).toFixed(1)} kN` : `${mag.toFixed(1)} N`;
+        const midX = v.origin.x + v.force.x * 0.5;
+        const midY = v.origin.y + v.force.y * 0.5;
+        // Offset label perpendicular to force direction
+        const nx = -v.force.y / mag;
+        const ny = v.force.x / mag;
+        const offsetDist = 12 / zoom;
+        ctx.font = `bold ${10 / zoom}px monospace`;
+        ctx.fillStyle = v.color;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(label, midX + nx * offsetDist, midY + ny * offsetDist);
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'alphabetic';
+      }
+    }
   }
 }
 

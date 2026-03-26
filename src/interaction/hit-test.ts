@@ -17,6 +17,7 @@ export function hitTestAny(
 ): boolean {
   const jointThreshold = HIT_RADIUS / zoom;
   for (const joint of Object.values(joints)) {
+    if (joint.hidden) continue;
     if (distance(worldPos, joint.position) < jointThreshold) return true;
   }
   const linkThreshold = LINK_HIT_THRESHOLD / zoom;
@@ -24,6 +25,7 @@ export function hitTestAny(
     const jA = joints[link.jointIds[0]];
     const jB = joints[link.jointIds[1]];
     if (!jA || !jB) continue;
+    if (jA.hidden || jB.hidden) continue;
     if (distToSegment(worldPos, jA.position, jB.position) < linkThreshold) return true;
   }
   return false;
@@ -39,9 +41,10 @@ export function hitTestJoint(
 ): Joint | null {
   const threshold = HIT_RADIUS / zoom;
 
-  // Collect all joints within hit radius
+  // Collect all joints within hit radius (skip hidden bracing joints)
   const hits: { joint: Joint; dist: number }[] = [];
   for (const joint of Object.values(joints)) {
+    if (joint.hidden) continue;
     const d = distance(worldPos, joint.position);
     if (d < threshold) {
       hits.push({ joint, dist: d });
@@ -88,6 +91,7 @@ export function hitTestLink(
     const jA = joints[link.jointIds[0]];
     const jB = joints[link.jointIds[1]];
     if (!jA || !jB) continue;
+    if (jA.hidden || jB.hidden) continue;
     const d = distToSegment(worldPos, jA.position, jB.position);
     if (d < threshold && d < closestDist) {
       closestDist = d;

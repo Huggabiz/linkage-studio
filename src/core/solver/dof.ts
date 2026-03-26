@@ -11,12 +11,20 @@ export function computeDOF(
 ): number {
   let unknowns = 0;
   for (const joint of Object.values(joints)) {
+    if (joint.hidden) continue; // exclude bracing joints from user-facing DOF
     const isFixed = fixedJointIds ? fixedJointIds.has(joint.id) : joint.type === 'fixed';
     if (isFixed) continue;
     unknowns += 2;
   }
 
-  let constraints = Object.keys(links).length;
+  // Exclude links involving hidden bracing joints from DOF count
+  let constraints = 0;
+  for (const link of Object.values(links)) {
+    const jA = joints[link.jointIds[0]];
+    const jB = joints[link.jointIds[1]];
+    if (jA?.hidden || jB?.hidden) continue;
+    constraints++;
+  }
   if (hasDriver) constraints += 1;
 
   return unknowns - constraints;
