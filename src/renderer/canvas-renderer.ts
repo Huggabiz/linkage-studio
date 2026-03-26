@@ -56,10 +56,6 @@ export function render(
     drawGrid(ctx, state.camera, w, h, state.gridSize);
   }
 
-  if (state.showRulers) {
-    drawRulers(ctx, state.camera, w, h);
-  }
-
   // Draw images behind mechanism
   drawImages(ctx, state.images, state.camera.zoom, state.selectedIds);
 
@@ -138,6 +134,12 @@ export function render(
   }
 
   resetCamera(ctx);
+
+  // Rulers are drawn in screen-space, pinned to viewport edges
+  if (state.showRulers) {
+    drawRulers(ctx, state.camera, w, h);
+  }
+
   drawHUD(ctx, w, h, state.dof, state.cursorWorld);
   drawModeBadge(ctx, w, state.mode);
 }

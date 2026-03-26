@@ -1,6 +1,8 @@
 import { useEditorStore } from '../../store/editor-store';
 import { useMechanismStore } from '../../store/mechanism-store';
+import { useSimulationStore } from '../../store/simulation-store';
 import { serializeMechanism, deserializeMechanism, saveFileAs, openFilePicker } from '../../utils/file-io';
+import type { GridLevel } from '../../types';
 import './TopBar.css';
 
 declare const __APP_VERSION__: string;
@@ -22,7 +24,27 @@ export function TopBar() {
   const isCreate = mode === 'create';
 
   const handleSave = async () => {
-    const json = serializeMechanism(joints, links, bodies, baseBodyId, outlines, images, sliders);
+    const editor = useEditorStore.getState();
+    const sim = useSimulationStore.getState();
+
+    const viewPreferences = {
+      showLinks: editor.showLinks,
+      showVectors: editor.showVectors,
+      showRulers: editor.showRulers,
+      showForceUnits: editor.showForceUnits,
+      gridLevel: editor.gridLevel,
+      camera: { pan: { ...editor.camera.pan }, zoom: editor.camera.zoom },
+    };
+
+    const simulationSettings = {
+      gravityEnabled: sim.gravityEnabled,
+      gravityStrength: sim.gravityStrength,
+      damping: sim.damping,
+      dragMultiplier: sim.dragMultiplier,
+      dragDamping: sim.dragDamping,
+    };
+
+    const json = serializeMechanism(joints, links, bodies, baseBodyId, outlines, images, sliders, viewPreferences, simulationSettings);
     const timestamp = new Date().toISOString().slice(0, 16).replace(/[:-]/g, '');
     await saveFileAs(json, `linkage_${timestamp}.slinker`);
   };
@@ -34,6 +56,32 @@ export function TopBar() {
     if (!state) { alert('Invalid file format'); return; }
     loadState(state);
     clearSelection();
+
+    // Restore view preferences
+    if (state.viewPreferences) {
+      const vp = state.viewPreferences;
+      const editor = useEditorStore.getState();
+      if (vp.showLinks !== undefined) { if (vp.showLinks !== editor.showLinks) editor.toggleShowLinks(); }
+      if (vp.showVectors !== undefined) { if (vp.showVectors !== editor.showVectors) editor.toggleShowVectors(); }
+      if (vp.showRulers !== undefined) { if (vp.showRulers !== editor.showRulers) editor.toggleShowRulers(); }
+      if (vp.showForceUnits !== undefined) { if (vp.showForceUnits !== editor.showForceUnits) editor.toggleShowForceUnits(); }
+      if (vp.gridLevel) editor.setGridLevel(vp.gridLevel as GridLevel);
+      if (vp.camera) {
+        // Set camera directly via store
+        useEditorStore.setState({ camera: { pan: vp.camera.pan, zoom: vp.camera.zoom } });
+      }
+    }
+
+    // Restore simulation settings
+    if (state.simulationSettings) {
+      const ss = state.simulationSettings;
+      const sim = useSimulationStore.getState();
+      if (ss.gravityEnabled !== undefined && ss.gravityEnabled !== sim.gravityEnabled) sim.toggleGravity();
+      if (ss.gravityStrength !== undefined) sim.setGravityStrength(ss.gravityStrength);
+      if (ss.damping !== undefined) sim.setDamping(ss.damping);
+      if (ss.dragMultiplier !== undefined) sim.setDragMultiplier(ss.dragMultiplier);
+      if (ss.dragDamping !== undefined) sim.setDragDamping(ss.dragDamping);
+    }
   };
 
   return (

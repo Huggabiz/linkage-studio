@@ -2,8 +2,8 @@
 export const JOINT_RADIUS = 8;
 export const JOINT_RADIUS_FIXED = 10;
 export const LINK_WIDTH = 4;
-export const GRID_COLOR = '#e0e0e0';
-export const GRID_MAJOR_COLOR = '#c0c0c0';
+export const GRID_COLOR = '#ddd';
+export const GRID_MAJOR_COLOR = '#aaa';
 export const BACKGROUND_COLOR = '#f8f8f8';
 export const SELECTION_COLOR = '#2196F3';
 export const HOVER_COLOR = '#64B5F6';

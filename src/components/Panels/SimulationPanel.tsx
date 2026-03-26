@@ -9,15 +9,12 @@ export function SimulationPanel() {
   const speed = useSimulationStore((s) => s.speed);
   const dof = useSimulationStore((s) => s.dof);
   const time = useSimulationStore((s) => s.time);
-  // const driverJointId = useSimulationStore((s) => s.driverJointId);
   const gravityEnabled = useSimulationStore((s) => s.gravityEnabled);
   const gravityStrength = useSimulationStore((s) => s.gravityStrength);
   const play = useSimulationStore((s) => s.play);
   const pause = useSimulationStore((s) => s.pause);
   const reset = useSimulationStore((s) => s.reset);
   const setSpeed = useSimulationStore((s) => s.setSpeed);
-  // const setDriver = useSimulationStore((s) => s.setDriver);
-  // const clearDriver = useSimulationStore((s) => s.clearDriver);
   const clearTraces = useSimulationStore((s) => s.clearTraces);
   const toggleGravity = useSimulationStore((s) => s.toggleGravity);
   const setGravityStrength = useSimulationStore((s) => s.setGravityStrength);
@@ -27,8 +24,6 @@ export function SimulationPanel() {
   const setDragMultiplier = useSimulationStore((s) => s.setDragMultiplier);
   const dragDamp = useSimulationStore((s) => s.dragDamping);
   const setDragDamping = useSimulationStore((s) => s.setDragDamping);
-
-  const joints = useMechanismStore((s) => s.joints);
 
   const showLinks = useEditorStore((s) => s.showLinks);
   const showVectors = useEditorStore((s) => s.showVectors);
@@ -227,29 +222,8 @@ export function SimulationPanel() {
   // --- CREATE MODE ---
   return (
     <div className="panel-content">
-      <div className="panel-title">Simulation</div>
+      <div className="panel-title">Properties</div>
       <div className="panel-info">DOF: {dof}</div>
-
-      <div className="sim-controls">
-        <button className="tool-btn" onClick={isPlaying ? pause : play}>
-          {isPlaying ? 'Pause' : 'Play'}
-        </button>
-        <button className="tool-btn" onClick={reset}>Reset</button>
-        <button className="tool-btn" onClick={clearTraces}>Clear Traces</button>
-      </div>
-
-      <label>
-        Speed
-        <input
-          type="range"
-          min={0.1}
-          max={5}
-          step={0.1}
-          value={speed}
-          onChange={(e) => setSpeed(+e.target.value)}
-        />
-        <span>{speed.toFixed(1)}x</span>
-      </label>
 
       {physicsSection}
 

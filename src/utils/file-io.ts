@@ -1,6 +1,26 @@
 import type { Joint, Link, Body, Outline, CanvasImage, SliderConstraint, Vec2 } from '../types';
+import type { GridLevel, CameraState } from '../types';
 
 declare const __APP_VERSION__: string;
+
+/** View preferences saved with the file */
+interface ViewPreferences {
+  showLinks?: boolean;
+  showVectors?: boolean;
+  showRulers?: boolean;
+  showForceUnits?: boolean;
+  gridLevel?: string;
+  camera?: { pan: Vec2; zoom: number };
+}
+
+/** Simulation/physics settings saved with the file */
+interface SimulationSettings {
+  gravityEnabled?: boolean;
+  gravityStrength?: number;
+  damping?: number;
+  dragMultiplier?: number;
+  dragDamping?: number;
+}
 
 /** Serializable format for a linkage file (.slinker) */
 interface SlinkerFile {
@@ -12,6 +32,8 @@ interface SlinkerFile {
   outlines: Record<string, { id: string; bodyId: string; name?: string; visible?: boolean; points: Vec2[] }>;
   images?: Record<string, { id: string; bodyId: string; src: string; position: Vec2; scale: number; rotation: number; opacity: number; visible: boolean; naturalWidth: number; naturalHeight: number }>;
   sliders?: Record<string, { id: string; jointIdA: string; jointIdB: string; jointIdC: string; t: number }>;
+  viewPreferences?: ViewPreferences;
+  simulationSettings?: SimulationSettings;
 }
 
 export function serializeMechanism(
@@ -22,6 +44,8 @@ export function serializeMechanism(
   outlines: Record<string, Outline>,
   images?: Record<string, CanvasImage>,
   sliders?: Record<string, SliderConstraint>,
+  viewPreferences?: ViewPreferences,
+  simulationSettings?: SimulationSettings,
 ): string {
   const data: SlinkerFile = {
     version: __APP_VERSION__,
@@ -33,9 +57,15 @@ export function serializeMechanism(
   };
 
   for (const [id, j] of Object.entries(joints)) {
+    // Skip hidden bracing joints — they are regenerated on load
+    if (j.hidden) continue;
     data.joints[id] = { id: j.id, type: j.type, position: { x: j.position.x, y: j.position.y }, connectedLinkIds: [...j.connectedLinkIds] };
   }
   for (const [id, l] of Object.entries(links)) {
+    // Skip links involving hidden bracing joints
+    const jA = joints[l.jointIds[0]];
+    const jB = joints[l.jointIds[1]];
+    if (jA?.hidden || jB?.hidden) continue;
     data.links[id] = { id: l.id, jointIds: [l.jointIds[0], l.jointIds[1]], restLength: l.restLength, mass: l.mass };
   }
   for (const [id, b] of Object.entries(bodies)) {
@@ -64,6 +94,9 @@ export function serializeMechanism(
     }
   }
 
+  if (viewPreferences) data.viewPreferences = viewPreferences;
+  if (simulationSettings) data.simulationSettings = simulationSettings;
+
   return JSON.stringify(data, null, 2);
 }
 
@@ -75,6 +108,8 @@ export function deserializeMechanism(json: string): {
   outlines: Record<string, Outline>;
   images?: Record<string, CanvasImage>;
   sliders?: Record<string, SliderConstraint>;
+  viewPreferences?: ViewPreferences;
+  simulationSettings?: SimulationSettings;
 } | null {
   try {
     const data: SlinkerFile = JSON.parse(json);
@@ -142,7 +177,11 @@ export function deserializeMechanism(json: string): {
       }
     }
 
-    return { joints, links, bodies, baseBodyId: data.baseBodyId, outlines, images, sliders };
+    return {
+      joints, links, bodies, baseBodyId: data.baseBodyId, outlines, images, sliders,
+      viewPreferences: data.viewPreferences,
+      simulationSettings: data.simulationSettings,
+    };
   } catch {
     return null;
   }

@@ -43,7 +43,7 @@ export function drawGrid(
   }
 
   // Origin cross
-  ctx.strokeStyle = '#aaa';
+  ctx.strokeStyle = '#666';
   ctx.lineWidth = 1.5 / zoom;
   const crossSize = 15 / zoom;
   ctx.beginPath();
@@ -55,9 +55,11 @@ export function drawGrid(
 }
 
 /**
- * Draw ruler tick marks and dimension labels along the x=0 and y=0 axes.
- * Uses cm/mm units where 1cm = DEFAULT_GRID_SIZE (25px).
- * Adaptively shows finer graduations as zoom increases.
+ * Draw ruler strips pinned to the top and left edges of the canvas.
+ * Tick positions correspond to world coordinates (1cm = 25 world units).
+ * The strips stay fixed to the viewport — they don't scroll with the canvas.
+ *
+ * IMPORTANT: This must be called AFTER resetCamera() since it draws in screen space.
  */
 export function drawRulers(
   ctx: CanvasRenderingContext2D,
@@ -67,6 +69,11 @@ export function drawRulers(
 ) {
   const { pan, zoom } = camera;
   const PX_PER_CM = 25; // 1cm = 25 world units
+  const RULER_SIZE = 20; // px height/width of ruler strip
+
+  // Work in screen-space (identity transform assumed)
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
 
   // Visible world bounds
   const left = -pan.x / zoom;
@@ -74,83 +81,104 @@ export function drawRulers(
   const right = (canvasWidth - pan.x) / zoom;
   const bottom = (canvasHeight - pan.y) / zoom;
 
-  // Determine tick spacing based on zoom level
-  // We want at least ~40px screen-space between major ticks
-  // and ~8px between minor ticks
-  const cmScreenPx = PX_PER_CM * zoom; // how many screen pixels per cm
-
-  // Choose major unit: 1mm, 2mm, 5mm, 1cm, 2cm, 5cm, 10cm, 20cm, 50cm, 1m...
+  // Adaptive tick spacing
+  const cmScreenPx = PX_PER_CM * zoom;
   const steps = [0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000];
   let majorCm = 1;
   for (const s of steps) {
     if (s * cmScreenPx >= 40) { majorCm = s; break; }
   }
-  // Minor ticks: subdivide major by 5 or 10
   const minorCm = majorCm / 5;
   const minorScreenPx = minorCm * cmScreenPx;
 
-  const majorTickLen = 8 / zoom;
-  const minorTickLen = 4 / zoom;
+  // --- Top ruler strip (horizontal, along X axis) ---
+  ctx.fillStyle = 'rgba(248, 248, 248, 0.92)';
+  ctx.fillRect(RULER_SIZE, 0, canvasWidth - RULER_SIZE, RULER_SIZE);
+  // Bottom border
+  ctx.strokeStyle = '#ccc';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(RULER_SIZE, RULER_SIZE);
+  ctx.lineTo(canvasWidth, RULER_SIZE);
+  ctx.stroke();
 
-  ctx.textBaseline = 'top';
-  ctx.textAlign = 'center';
-
-  // --- Horizontal ruler (along y=0 axis) ---
   const xStartCm = Math.floor((left / PX_PER_CM) / minorCm) * minorCm;
   const xEndCm = Math.ceil((right / PX_PER_CM) / minorCm) * minorCm;
 
   for (let cm = xStartCm; cm <= xEndCm; cm += minorCm) {
     const worldX = cm * PX_PER_CM;
-    if (worldX === 0) continue; // skip origin
+    const screenX = worldX * zoom + pan.x;
+    if (screenX < RULER_SIZE || screenX > canvasWidth) continue;
+
     const isMajor = Math.abs(cm - Math.round(cm / majorCm) * majorCm) < minorCm * 0.1;
-    const tickLen = isMajor ? majorTickLen : minorTickLen;
+    const tickH = isMajor ? RULER_SIZE : RULER_SIZE * 0.4;
 
     ctx.beginPath();
-    ctx.moveTo(worldX, -tickLen);
-    ctx.lineTo(worldX, tickLen);
-    ctx.strokeStyle = isMajor ? '#999' : '#bbb';
-    ctx.lineWidth = (isMajor ? 1.2 : 0.8) / zoom;
+    ctx.moveTo(screenX, RULER_SIZE);
+    ctx.lineTo(screenX, RULER_SIZE - tickH);
+    ctx.strokeStyle = isMajor ? '#888' : '#bbb';
+    ctx.lineWidth = isMajor ? 1 : 0.5;
     ctx.stroke();
 
-    // Label major ticks
     if (isMajor && minorScreenPx > 2) {
-      const label = formatRulerLabel(cm);
-      ctx.font = `${9 / zoom}px monospace`;
-      ctx.fillStyle = '#888';
-      ctx.fillText(label, worldX, tickLen + 2 / zoom);
+      ctx.font = '9px monospace';
+      ctx.fillStyle = '#666';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillText(formatRulerLabel(cm), screenX, 2);
     }
   }
 
-  // --- Vertical ruler (along x=0 axis) ---
-  ctx.textBaseline = 'middle';
-  ctx.textAlign = 'left';
+  // --- Left ruler strip (vertical, along Y axis) ---
+  ctx.fillStyle = 'rgba(248, 248, 248, 0.92)';
+  ctx.fillRect(0, RULER_SIZE, RULER_SIZE, canvasHeight - RULER_SIZE);
+  // Right border
+  ctx.strokeStyle = '#ccc';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(RULER_SIZE, RULER_SIZE);
+  ctx.lineTo(RULER_SIZE, canvasHeight);
+  ctx.stroke();
 
   const yStartCm = Math.floor((top / PX_PER_CM) / minorCm) * minorCm;
   const yEndCm = Math.ceil((bottom / PX_PER_CM) / minorCm) * minorCm;
 
   for (let cm = yStartCm; cm <= yEndCm; cm += minorCm) {
     const worldY = cm * PX_PER_CM;
-    if (worldY === 0) continue;
+    const screenY = worldY * zoom + pan.y;
+    if (screenY < RULER_SIZE || screenY > canvasHeight) continue;
+
     const isMajor = Math.abs(cm - Math.round(cm / majorCm) * majorCm) < minorCm * 0.1;
-    const tickLen = isMajor ? majorTickLen : minorTickLen;
+    const tickW = isMajor ? RULER_SIZE : RULER_SIZE * 0.4;
 
     ctx.beginPath();
-    ctx.moveTo(-tickLen, worldY);
-    ctx.lineTo(tickLen, worldY);
-    ctx.strokeStyle = isMajor ? '#999' : '#bbb';
-    ctx.lineWidth = (isMajor ? 1.2 : 0.8) / zoom;
+    ctx.moveTo(RULER_SIZE, screenY);
+    ctx.lineTo(RULER_SIZE - tickW, screenY);
+    ctx.strokeStyle = isMajor ? '#888' : '#bbb';
+    ctx.lineWidth = isMajor ? 1 : 0.5;
     ctx.stroke();
 
     if (isMajor && minorScreenPx > 2) {
-      const label = formatRulerLabel(cm);
-      ctx.font = `${9 / zoom}px monospace`;
-      ctx.fillStyle = '#888';
-      ctx.fillText(label, tickLen + 2 / zoom, worldY);
+      ctx.save();
+      ctx.translate(10, screenY);
+      ctx.rotate(-Math.PI / 2);
+      ctx.font = '9px monospace';
+      ctx.fillStyle = '#666';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(formatRulerLabel(cm), 0, 0);
+      ctx.restore();
     }
   }
 
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'alphabetic';
+  // Corner square (where rulers meet)
+  ctx.fillStyle = 'rgba(248, 248, 248, 0.92)';
+  ctx.fillRect(0, 0, RULER_SIZE, RULER_SIZE);
+  ctx.strokeStyle = '#ccc';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(0, 0, RULER_SIZE, RULER_SIZE);
+
+  ctx.restore();
 }
 
 function formatRulerLabel(cm: number): string {
