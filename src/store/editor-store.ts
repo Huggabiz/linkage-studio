@@ -32,6 +32,8 @@ interface EditorStore {
   activeBodyIds: Set<string>;
   showLinks: boolean;
   showVectors: boolean;
+  showRulers: boolean;
+  showForceUnits: boolean;
   createTool: CreateTool;
   jointMode: JointMode;
   autoChainLastBodyId: string | null;
@@ -59,6 +61,8 @@ interface EditorStore {
   setActiveBody(id: string): void;
   toggleShowLinks(): void;
   toggleShowVectors(): void;
+  toggleShowRulers(): void;
+  toggleShowForceUnits(): void;
   setCreateTool(tool: CreateTool): void;
   setJointMode(mode: JointMode): void;
   setAutoChainLastBodyId(id: string | null): void;
@@ -90,6 +94,8 @@ export const useEditorStore = create<EditorStore>((set) => ({
   activeBodyIds: new Set(['base']),
   showLinks: true,
   showVectors: true,
+  showRulers: true,
+  showForceUnits: true,
   createTool: 'joints' as CreateTool,
   jointMode: 'manual' as JointMode,
   autoChainLastBodyId: null as string | null,
@@ -202,6 +208,14 @@ export const useEditorStore = create<EditorStore>((set) => ({
 
   toggleShowVectors() {
     set((s) => ({ showVectors: !s.showVectors }));
+  },
+
+  toggleShowRulers() {
+    set((s) => ({ showRulers: !s.showRulers }));
+  },
+
+  toggleShowForceUnits() {
+    set((s) => ({ showForceUnits: !s.showForceUnits }));
   },
 
   setCreateTool(tool) {

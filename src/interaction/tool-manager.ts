@@ -331,8 +331,9 @@ export function handleMouseDown(e: PointerEvent, canvas: HTMLCanvasElement) {
             const t = Math.max(0, Math.min(1, dot(ap, ab) / abLenSq));
             const closest = { x: a.x + ab.x * t, y: a.y + ab.y * t };
             if (distance(worldPos, closest) < hitRadius) {
-              // Insert new vertex at the clicked position
-              const localPt = worldToLocal(worldPos, transform);
+              // Insert new vertex at the clicked position (grid-snapped)
+              const snappedWorld = editor.gridEnabled ? snapToGrid(worldPos, editor.gridSize) : worldPos;
+              const localPt = worldToLocal(snappedWorld, transform);
               mechanism.insertOutlineVertex(editor.editingOutlineId, i, localPt);
               editor.setEditingVertexIndex(i + 1);
               outlineVertexDragIndex = i + 1;
@@ -559,7 +560,8 @@ export function handleMouseMove(e: PointerEvent, canvas: HTMLCanvasElement) {
       const body = mechanism.bodies[outline.bodyId];
       if (body) {
         const transform = computeBodyTransform(body, mechanism.joints);
-        const localPt = worldToLocal(worldPos, transform);
+        const snappedWorld = editor.gridEnabled && !e.altKey ? snapToGrid(worldPos, editor.gridSize) : worldPos;
+        const localPt = worldToLocal(snappedWorld, transform);
         const newPoints = [...outline.points];
         newPoints[outlineVertexDragIndex] = localPt;
         mechanism.updateOutlinePoints(outlineVertexDragOutlineId, newPoints);

@@ -15,9 +15,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icon-192.svg', 'icon-512.svg'],
       manifest: {
-        name: 'Linkage Studio',
-        short_name: 'Linkage',
-        description: 'Design and simulate 2.5D linkage mechanisms',
+        name: 'Slinker',
+        short_name: 'Slinker',
+        description: 'Design and simulate 2D mechanical linkages',
         theme_color: '#2d2d2d',
         background_color: '#1a1a1a',
         display: 'standalone',

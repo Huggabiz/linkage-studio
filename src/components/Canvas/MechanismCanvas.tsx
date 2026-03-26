@@ -72,6 +72,8 @@ export function MechanismCanvas() {
         forceVectors: sim.solverResult?.forceVectors || [],
         showLinks: editor.showLinks,
         showVectors: editor.showVectors,
+        showRulers: editor.showRulers,
+        showForceUnits: editor.showForceUnits,
         createTool: editor.createTool,
         outlinePoints: editor.outlinePoints,
         activeBodyColor: (() => {
