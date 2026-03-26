@@ -1,9 +1,9 @@
 import { useEditorStore } from '../../store/editor-store';
 import { useMechanismStore } from '../../store/mechanism-store';
 import type { AppMode } from '../../types';
-import type { Vec2 } from '../../types';
 import { screenToWorld } from '../../renderer/camera';
-import { computeBodyTransform, localToWorld } from '../../core/body-transform';
+import type { Vec2 } from '../../types';
+import { switchMode } from '../../utils/mode-switch';
 import './Toolbar.css';
 
 /* Inline SVG tool icons (16×16 viewBox) */
@@ -54,8 +54,6 @@ export function Toolbar() {
   const setCreateTool = useEditorStore((s) => s.setCreateTool);
   const setJointMode = useEditorStore((s) => s.setJointMode);
   const setMode = useEditorStore((s) => s.setMode);
-  const setSavedPositions = useEditorStore((s) => s.setSavedPositions);
-  const savedPositions = useEditorStore((s) => s.savedPositions);
   const removeJoint = useMechanismStore((s) => s.removeJoint);
   const removeOutline = useMechanismStore((s) => s.removeOutline);
   const removeImage = useMechanismStore((s) => s.removeImage);
@@ -64,9 +62,6 @@ export function Toolbar() {
   const images = useMechanismStore((s) => s.images);
   const selectedIds = useEditorStore((s) => s.selectedIds);
   const clearSelection = useEditorStore((s) => s.clearSelection);
-  const moveJoint = useMechanismStore((s) => s.moveJoint);
-  const regenerateLinks = useMechanismStore((s) => s.regenerateLinks);
-  const removeTempJoint = useMechanismStore((s) => s.removeTempJoint);
   const addImage = useMechanismStore((s) => s.addImage);
   const baseBodyId = useMechanismStore((s) => s.baseBodyId);
 
@@ -96,59 +91,7 @@ export function Toolbar() {
     clearSelection();
   };
 
-  const handleModeSwitch = (newMode: AppMode) => {
-    if (newMode === mode) return;
-
-    const editorState = useEditorStore.getState();
-    if (editorState.simDrag?.tempJointId) {
-      removeTempJoint(editorState.simDrag.tempJointId);
-      editorState.setSimDrag(null);
-    }
-
-    if (newMode === 'simulate') {
-      if (editorState.lockOutlines && editorState.frozenOutlineWorldPoints.size > 0) {
-        useMechanismStore.getState().reprojectOutlinesFromWorld(editorState.frozenOutlineWorldPoints);
-        editorState.setLockOutlines(false);
-      }
-
-      const currentJoints = useMechanismStore.getState().joints;
-      const positions: Record<string, Vec2> = {};
-      for (const [id, joint] of Object.entries(currentJoints)) {
-        if (id.startsWith('__temp_')) continue;
-        positions[id] = { ...joint.position };
-      }
-      setSavedPositions(positions);
-      regenerateLinks();
-    } else {
-      if (savedPositions) {
-        const currentJoints = useMechanismStore.getState().joints;
-        for (const [id, pos] of Object.entries(savedPositions)) {
-          if (currentJoints[id]) {
-            moveJoint(id, pos);
-          }
-        }
-        setSavedPositions(null);
-        regenerateLinks();
-      }
-    }
-
-    setMode(newMode);
-
-    // After switching back to create mode, setMode resets lockOutlines=true
-    // with empty frozenOutlineWorldPoints. Capture fresh frozen points so
-    // the lock is actually effective.
-    if (newMode === 'create') {
-      const mech = useMechanismStore.getState();
-      const frozen = new Map<string, Vec2[]>();
-      for (const outline of Object.values(mech.outlines)) {
-        const body = mech.bodies[outline.bodyId];
-        if (!body || outline.points.length < 2) continue;
-        const transform = computeBodyTransform(body, mech.joints);
-        frozen.set(outline.id, outline.points.map((p) => localToWorld(p, transform)));
-      }
-      useEditorStore.getState().setLockOutlines(true, frozen);
-    }
-  };
+  const handleModeSwitch = (newMode: AppMode) => switchMode(newMode);
 
   const handleImportImage = () => {
     const input = document.createElement('input');

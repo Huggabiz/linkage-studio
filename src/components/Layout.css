@@ -28,15 +28,6 @@
   overflow: hidden;
 }
 
-.right-panel {
-  width: 260px;
-  background: #1e1e1e;
-  border-left: 1px solid #333;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-}
-
 .panel-content {
   padding: 8px 10px;
   border-bottom: 1px solid #333;
@@ -164,62 +155,18 @@
 
 /* --- Collapsible panels --- */
 
-.toolbar-wrapper {
-  position: relative;
+/* Shared collapse/expand header bar */
+.collapse-header {
   display: flex;
-  flex-direction: column;
-}
-
-.toolbar-collapsed {
-  display: flex;
-  flex-direction: column;
   align-items: center;
-  padding: 8px 4px;
-  gap: 4px;
+  justify-content: flex-end;
+  padding: 4px 6px;
+  border-bottom: 1px solid #333;
   background: #1e1e1e;
-  border-right: 1px solid #333;
-  width: 36px;
 }
 
-.collapsed-mode-btn {
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #2a2a2a;
-  border: 1px solid #444;
-  border-radius: 4px;
-  color: #888;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.collapsed-mode-btn:hover {
-  background: #333;
-  color: #ccc;
-}
-
-.collapsed-mode-btn.active {
-  background: #333;
-  color: #fff;
-  border-color: #555;
-}
-
-.collapsed-mode-btn.simulate.active {
-  background: #4a3000;
-  color: #FF9800;
-  border-color: #FF9800;
-}
-
-.panel-collapsed {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 8px 4px;
-  background: #1e1e1e;
-  border-left: 1px solid #333;
-  width: 28px;
+.collapse-header.right {
+  justify-content: flex-start;
 }
 
 .collapse-btn {
@@ -242,23 +189,135 @@
   color: #ccc;
 }
 
-.toolbar-collapse {
-  position: absolute;
-  bottom: 4px;
-  left: 50%;
-  transform: translateX(-50%);
+/* Expanded toolbar wrapper */
+.toolbar-wrapper {
+  display: flex;
+  flex-direction: column;
 }
 
-.panel-collapse {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 1;
-}
-
+/* Right panel (expanded) */
 .right-panel {
-  position: relative;
+  width: 260px;
+  background: #1e1e1e;
+  border-left: 1px solid #333;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
+
+/* Right panel (collapsed) */
+.panel-collapsed {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px;
+  background: #1e1e1e;
+  border-left: 1px solid #333;
+}
+
+/* ---- LEFT TOOLBAR COLLAPSED ---- */
+
+.toolbar-collapsed {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px;
+  gap: 2px;
+  background: #1e1e1e;
+  border-right: 1px solid #333;
+  width: 36px;
+}
+
+/* Joined mode toggle group */
+.collapsed-mode-group {
+  display: flex;
+  flex-direction: column;
+  margin-top: 6px;
+}
+
+.collapsed-mode-btn {
+  width: 28px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  color: #888;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.collapsed-mode-btn.top {
+  border-radius: 4px 4px 0 0;
+  border-bottom: none;
+}
+
+.collapsed-mode-btn.bottom {
+  border-radius: 0 0 4px 4px;
+}
+
+.collapsed-mode-btn:hover {
+  background: #333;
+  color: #ccc;
+}
+
+.collapsed-mode-btn.active {
+  background: #333;
+  color: #fff;
+  border-color: #555;
+}
+
+.collapsed-mode-btn.simulate.active {
+  background: #4a3000;
+  color: #FF9800;
+  border-color: #FF9800;
+}
+
+/* Divider line between tool groups */
+.collapsed-divider {
+  width: 22px;
+  height: 0;
+  border-top: 1px solid #444;
+  margin: 4px 0 2px;
+}
+
+/* Tiny group label */
+.collapsed-group-label {
+  font-size: 7px;
+  text-transform: uppercase;
+  color: #555;
+  letter-spacing: 0.4px;
+  margin-bottom: 1px;
+}
+
+/* Tool buttons in collapsed state */
+.collapsed-tool-btn {
+  width: 28px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: #999;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.collapsed-tool-btn:hover {
+  background: #2a2a2a;
+  color: #ccc;
+}
+
+.collapsed-tool-btn.active {
+  background: #333;
+  border-color: #555;
+  color: #fff;
+}
+
+/* ---- Sim controls ---- */
 
 .sim-controls {
   display: flex;
