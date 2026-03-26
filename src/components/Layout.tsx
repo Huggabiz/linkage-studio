@@ -21,15 +21,13 @@ const ChevronIcon = ({ direction }: { direction: 'left' | 'right' }) => (
   </svg>
 );
 
-/* ---- Mode icons for collapsed toolbar ---- */
+/* ---- Mode icons ---- */
 
-/* Create: set-square / drafting tool */
+/* Create: pencil */
 const IconCreateMode = () => (
-  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M3 16L3 4L13 16Z" />
-    <line x1="3" y1="10" x2="8.5" y2="10" />
-    <line x1="14" y1="3" x2="16" y2="5" />
-    <line x1="15" y1="4" x2="10" y2="9" />
+  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12.5 2.5L15.5 5.5L6 15H3V12L12.5 2.5Z" />
+    <line x1="10.5" y1="4.5" x2="13.5" y2="7.5" />
   </svg>
 );
 
@@ -46,7 +44,7 @@ const IconSimulateMode = () => (
   </svg>
 );
 
-/* ---- Tool icons (reused from Toolbar but smaller for collapsed state) ---- */
+/* ---- Tool icons for collapsed toolbar ---- */
 const IconPivotSmall = () => (
   <svg width="18" height="18" viewBox="0 0 16 16">
     <circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.3" />
@@ -76,6 +74,56 @@ const IconImageSmall = () => (
     <polyline points="2,11 5,8.5 7.5,10 10.5,6.5 14,9.5" fill="none" stroke="currentColor" strokeWidth="1" strokeLinejoin="round" />
   </svg>
 );
+
+/* ---- Mini body list for collapsed right panel ---- */
+function CollapsedBodyList() {
+  const bodies = useMechanismStore((s) => s.bodies);
+  const baseBodyId = useMechanismStore((s) => s.baseBodyId);
+  const addBody = useMechanismStore((s) => s.addBody);
+  const activeBodyIds = useEditorStore((s) => s.activeBodyIds);
+  const toggleActiveBody = useEditorStore((s) => s.toggleActiveBody);
+
+  const bodyList = Object.values(bodies);
+  bodyList.sort((a, b) => {
+    if (a.id === baseBodyId) return -1;
+    if (b.id === baseBodyId) return 1;
+    return 0;
+  });
+
+  return (
+    <>
+      <button
+        className="collapsed-add-body"
+        onClick={() => addBody()}
+        title="Add body"
+      >
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+          <line x1="7" y1="2" x2="7" y2="12" />
+          <line x1="2" y1="7" x2="12" y2="7" />
+        </svg>
+      </button>
+      <div className="collapsed-divider-h" />
+      {bodyList.map((body) => (
+        <button
+          key={body.id}
+          className={`collapsed-body-dot ${activeBodyIds.has(body.id) ? 'active' : ''}`}
+          onClick={() => toggleActiveBody(body.id)}
+          title={body.name}
+        >
+          <span
+            className="body-dot"
+            style={{ background: body.color }}
+          />
+          {activeBodyIds.has(body.id) && (
+            <svg width="8" height="8" viewBox="0 0 10 10" className="body-check">
+              <polyline points="2,5 4.5,8 8,2" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          )}
+        </button>
+      ))}
+    </>
+  );
+}
 
 export function Layout() {
   const leftCollapsed = useEditorStore((s) => s.leftCollapsed);
@@ -126,12 +174,10 @@ export function Layout() {
         {/* ---- LEFT TOOLBAR ---- */}
         {leftCollapsed ? (
           <div className="toolbar-collapsed">
-            {/* Expand arrow */}
             <button className="collapse-btn" onClick={toggleLeft} title="Expand toolbar">
               <ChevronIcon direction="right" />
             </button>
 
-            {/* Mode toggle (joined pair) */}
             <div className="collapsed-mode-group">
               <button
                 className={`collapsed-mode-btn top ${mode === 'create' ? 'active' : ''}`}
@@ -149,7 +195,6 @@ export function Layout() {
               </button>
             </div>
 
-            {/* Tools (create mode only) */}
             {mode === 'create' && (
               <>
                 <div className="collapsed-divider" />
@@ -218,6 +263,7 @@ export function Layout() {
             <button className="collapse-btn" onClick={toggleRight} title="Expand panel">
               <ChevronIcon direction="left" />
             </button>
+            {mode === 'create' && <CollapsedBodyList />}
           </div>
         ) : (
           <div className="right-panel">
