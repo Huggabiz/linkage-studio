@@ -162,6 +162,104 @@
   color: #f66;
 }
 
+/* --- Collapsible panels --- */
+
+.toolbar-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.toolbar-collapsed {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 4px;
+  gap: 4px;
+  background: #1e1e1e;
+  border-right: 1px solid #333;
+  width: 36px;
+}
+
+.collapsed-mode-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 4px;
+  color: #888;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.collapsed-mode-btn:hover {
+  background: #333;
+  color: #ccc;
+}
+
+.collapsed-mode-btn.active {
+  background: #333;
+  color: #fff;
+  border-color: #555;
+}
+
+.collapsed-mode-btn.simulate.active {
+  background: #4a3000;
+  color: #FF9800;
+  border-color: #FF9800;
+}
+
+.panel-collapsed {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 4px;
+  background: #1e1e1e;
+  border-left: 1px solid #333;
+  width: 28px;
+}
+
+.collapse-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background: none;
+  border: none;
+  color: #666;
+  cursor: pointer;
+  border-radius: 3px;
+  padding: 0;
+  transition: all 0.15s;
+}
+
+.collapse-btn:hover {
+  background: #333;
+  color: #ccc;
+}
+
+.toolbar-collapse {
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.panel-collapse {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+}
+
+.right-panel {
+  position: relative;
+}
+
 .sim-controls {
   display: flex;
   gap: 4px;

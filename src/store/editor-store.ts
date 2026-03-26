@@ -40,6 +40,8 @@ interface EditorStore {
   outlinePoints: Vec2[];
   lockOutlines: boolean;
   frozenOutlineWorldPoints: Map<string, Vec2[]>;
+  leftCollapsed: boolean;
+  rightCollapsed: boolean;
   imageDragMode: 'move' | 'rotate' | 'scale' | null;
   sliderPointA: { position: Vec2; jointId: string } | null;  // first placed joint of slider
 
@@ -69,6 +71,8 @@ interface EditorStore {
   addOutlinePoint(pt: Vec2): void;
   clearOutlinePoints(): void;
   setLockOutlines(locked: boolean, frozenPoints?: Map<string, Vec2[]>): void;
+  toggleLeftCollapsed(): void;
+  toggleRightCollapsed(): void;
   setImageDragMode(mode: 'move' | 'rotate' | 'scale' | null): void;
   setSliderPointA(point: { position: Vec2; jointId: string } | null): void;
   editingOutlineId: string | null;
@@ -102,6 +106,8 @@ export const useEditorStore = create<EditorStore>((set) => ({
   outlinePoints: [] as Vec2[],
   lockOutlines: true,
   frozenOutlineWorldPoints: new Map(),
+  leftCollapsed: false,
+  rightCollapsed: false,
   imageDragMode: null,
   sliderPointA: null,
   editingOutlineId: null,
@@ -244,6 +250,14 @@ export const useEditorStore = create<EditorStore>((set) => ({
     } else {
       set({ lockOutlines: false, frozenOutlineWorldPoints: new Map() });
     }
+  },
+
+  toggleLeftCollapsed() {
+    set((s) => ({ leftCollapsed: !s.leftCollapsed }));
+  },
+
+  toggleRightCollapsed() {
+    set((s) => ({ rightCollapsed: !s.rightCollapsed }));
   },
 
   setImageDragMode(mode) {

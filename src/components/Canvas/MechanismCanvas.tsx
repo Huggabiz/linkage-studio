@@ -153,9 +153,13 @@ export function MechanismCanvas() {
   const simDrag = useEditorStore((s) => s.simDrag);
   const hoveredId = useEditorStore((s) => s.hoveredId);
 
+  // Custom dark crosshair cursor (SVG data URI) — the built-in CSS 'crosshair'
+  // renders white/invisible on some OS/browser combinations.
+  const CROSSHAIR_CURSOR = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Cline x1='12' y1='2' x2='12' y2='22' stroke='%23333' stroke-width='1.5'/%3E%3Cline x1='2' y1='12' x2='22' y2='12' stroke='%23333' stroke-width='1.5'/%3E%3Ccircle cx='12' cy='12' r='3' fill='none' stroke='%23333' stroke-width='1'/%3E%3C/svg%3E") 12 12, crosshair`;
+
   const cursor = mode === 'simulate'
     ? (simDrag?.active ? 'grabbing' : 'grab')
-    : (hoveredId ? 'pointer' : 'crosshair');
+    : (hoveredId ? 'pointer' : CROSSHAIR_CURSOR);
 
   const handlePinchMove = useCallback(() => {
     if (activePointers.size < 2) return;
