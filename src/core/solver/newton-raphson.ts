@@ -504,6 +504,8 @@ export function solveWithForce(
 
     // 3b. Collider wall enforcement: push joints back if they cross a barrier line.
     // Each affected joint must stay on its initial side of the collider segment.
+    // Track collided joints for velocity damping in step 4b.
+    const collidedJoints: { idx: number; nx: number; ny: number }[] = [];
     if (colliders && colliderSides) {
       for (const collider of Object.values(colliders)) {
         // Get barrier endpoints (may be fixed or free)
@@ -555,6 +557,7 @@ export function solveWithForce(
               const epsilon = 0.5;
               predicted[idx] = px - signedDist * nx + initialSide * epsilon * nx;
               predicted[idx + 1] = py - signedDist * ny + initialSide * epsilon * ny;
+              collidedJoints.push({ idx, nx, ny });
             }
           }
         }
@@ -565,6 +568,20 @@ export function solveWithForce(
     const invSubDt = 1 / subDt;
     for (let i = 0; i < n; i++) {
       v[i] = (predicted[i] - q[i]) * invSubDt;
+    }
+
+    // 4b. Collider velocity damping: for joints that hit a wall,
+    // remove normal velocity (no bounce) and apply friction to tangent.
+    const WALL_FRICTION = 0.7; // tangent velocity retention (0 = full stop, 1 = frictionless)
+    for (const { idx, nx, ny } of collidedJoints) {
+      const vx = v[idx], vy = v[idx + 1];
+      // Normal component (into wall) — remove entirely
+      const vn = vx * nx + vy * ny;
+      // Tangent component — apply friction
+      const tx = vx - vn * nx;
+      const ty = vy - vn * ny;
+      v[idx] = tx * WALL_FRICTION;
+      v[idx + 1] = ty * WALL_FRICTION;
     }
 
     // 5. Apply damping to velocity

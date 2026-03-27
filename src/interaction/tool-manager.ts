@@ -327,9 +327,10 @@ export function handleMouseDown(e: PointerEvent, canvas: HTMLCanvasElement) {
         }
       }
 
-      // Clicked empty space with something selected — deselect
+      // Clicked empty space with collider selected — deselect and revert to pivot
       if (editor.selectedIds.size > 0) {
         editor.clearSelection();
+        editor.setCreateTool('joints');
         return;
       }
     }
@@ -345,11 +346,12 @@ export function handleMouseDown(e: PointerEvent, canvas: HTMLCanvasElement) {
       // Second click: place endpoint C, create collider constraint + rigid link
       const activeBodyIds = Array.from(editor.activeBodyIds);
       const jointIdC = mechanism.addJoint('revolute', pos, activeBodyIds);
-      mechanism.addCollider(editor.colliderPointA.jointId, jointIdC);
+      const colliderId = mechanism.addCollider(editor.colliderPointA.jointId, jointIdC);
       // Add a rigid link between A and C
       mechanism.addLink(editor.colliderPointA.jointId, jointIdC);
       editor.setColliderPointA(null);
-      editor.setCreateTool('joints');
+      // Auto-select the barrier line so user can immediately assign bodies
+      editor.select(colliderId);
     }
     return;
   }
