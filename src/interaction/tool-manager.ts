@@ -296,6 +296,64 @@ export function handleMouseDown(e: PointerEvent, canvas: HTMLCanvasElement) {
     return;
   }
 
+  // --- COLLIDER TOOL ---
+  if (editor.createTool === 'collider') {
+    // Check for existing joint hit first (select it)
+    const existingJoint = hitTestJoint(worldPos, mechanism.joints, editor.camera.zoom);
+    if (existingJoint && !editor.colliderPointA) {
+      editor.select(existingJoint.id);
+      isDragging = true;
+      dragJointId = existingJoint.id;
+      mechanism.pushHistory();
+      return;
+    }
+
+    // Check for collider line hit (select the collider)
+    if (!editor.colliderPointA) {
+      for (const collider of Object.values(mechanism.colliders)) {
+        const jA = mechanism.joints[collider.jointIdA];
+        const jC = mechanism.joints[collider.jointIdC];
+        if (!jA || !jC) continue;
+        const ab = sub(jC.position, jA.position);
+        const ap = sub(worldPos, jA.position);
+        const abLenSq = lengthSq(ab);
+        if (abLenSq < 1e-8) continue;
+        const t = Math.max(0, Math.min(1, dot(ap, ab) / abLenSq));
+        const closest = { x: jA.position.x + ab.x * t, y: jA.position.y + ab.y * t };
+        const dist = distance(worldPos, closest);
+        if (dist < HIT_RADIUS / editor.camera.zoom) {
+          editor.select(collider.id);
+          return;
+        }
+      }
+
+      // Clicked empty space with something selected — deselect
+      if (editor.selectedIds.size > 0) {
+        editor.clearSelection();
+        return;
+      }
+    }
+
+    const pos = editor.gridEnabled ? snapToGrid(worldPos, editor.gridSize) : worldPos;
+
+    if (!editor.colliderPointA) {
+      // First click: place endpoint A
+      const activeBodyIds = Array.from(editor.activeBodyIds);
+      const jointId = mechanism.addJoint('revolute', pos, activeBodyIds);
+      editor.setColliderPointA({ position: pos, jointId });
+    } else {
+      // Second click: place endpoint C, create collider constraint + rigid link
+      const activeBodyIds = Array.from(editor.activeBodyIds);
+      const jointIdC = mechanism.addJoint('revolute', pos, activeBodyIds);
+      mechanism.addCollider(editor.colliderPointA.jointId, jointIdC);
+      // Add a rigid link between A and C
+      mechanism.addLink(editor.colliderPointA.jointId, jointIdC);
+      editor.setColliderPointA(null);
+      editor.setCreateTool('joints');
+    }
+    return;
+  }
+
   // --- OUTLINE TOOL ---
   if (editor.createTool === 'outline') {
     // --- OUTLINE EDIT MODE ---
@@ -709,8 +767,12 @@ export function handleKeyDown(e: KeyboardEvent) {
           exitOutlineEditMode();
         } else if (editor.sliderPointA) {
           // Cancel slider placement — remove the already-placed A joint
-          mechanism.undo(); // undo the addJoint for A
+          mechanism.undo();
           editor.setSliderPointA(null);
+        } else if (editor.colliderPointA) {
+          // Cancel collider placement — remove the already-placed A joint
+          mechanism.undo();
+          editor.setColliderPointA(null);
         } else if (editor.jointMode === 'autochain') {
           editor.setJointMode('manual');
         } else if (editor.outlinePoints.length > 0) {

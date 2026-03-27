@@ -1,4 +1,4 @@
-import type { Joint, Link, Body, Outline, CanvasImage, SliderConstraint, Vec2 } from '../types';
+import type { Joint, Link, Body, Outline, CanvasImage, SliderConstraint, ColliderConstraint, Vec2 } from '../types';
 import type { GridLevel, CameraState } from '../types';
 
 declare const __APP_VERSION__: string;
@@ -32,6 +32,7 @@ interface SlinkerFile {
   outlines: Record<string, { id: string; bodyId: string; name?: string; visible?: boolean; points: Vec2[] }>;
   images?: Record<string, { id: string; bodyId: string; src: string; position: Vec2; scale: number; rotation: number; opacity: number; visible: boolean; naturalWidth: number; naturalHeight: number }>;
   sliders?: Record<string, { id: string; jointIdA: string; jointIdB: string; jointIdC: string; t: number }>;
+  colliders?: Record<string, { id: string; jointIdA: string; jointIdC: string; bodyIds: string[] }>;
   viewPreferences?: ViewPreferences;
   simulationSettings?: SimulationSettings;
 }
@@ -44,6 +45,7 @@ export function serializeMechanism(
   outlines: Record<string, Outline>,
   images?: Record<string, CanvasImage>,
   sliders?: Record<string, SliderConstraint>,
+  colliders?: Record<string, ColliderConstraint>,
   viewPreferences?: ViewPreferences,
   simulationSettings?: SimulationSettings,
 ): string {
@@ -94,6 +96,13 @@ export function serializeMechanism(
     }
   }
 
+  if (colliders && Object.keys(colliders).length > 0) {
+    data.colliders = {};
+    for (const [id, c] of Object.entries(colliders)) {
+      data.colliders[id] = { id: c.id, jointIdA: c.jointIdA, jointIdC: c.jointIdC, bodyIds: [...c.bodyIds] };
+    }
+  }
+
   if (viewPreferences) data.viewPreferences = viewPreferences;
   if (simulationSettings) data.simulationSettings = simulationSettings;
 
@@ -108,6 +117,7 @@ export function deserializeMechanism(json: string): {
   outlines: Record<string, Outline>;
   images?: Record<string, CanvasImage>;
   sliders?: Record<string, SliderConstraint>;
+  colliders?: Record<string, ColliderConstraint>;
   viewPreferences?: ViewPreferences;
   simulationSettings?: SimulationSettings;
 } | null {
@@ -177,8 +187,15 @@ export function deserializeMechanism(json: string): {
       }
     }
 
+    const colliders: Record<string, ColliderConstraint> = {};
+    if (data.colliders) {
+      for (const [id, c] of Object.entries(data.colliders)) {
+        colliders[id] = { id: c.id, jointIdA: c.jointIdA, jointIdC: c.jointIdC, bodyIds: c.bodyIds || [] };
+      }
+    }
+
     return {
-      joints, links, bodies, baseBodyId: data.baseBodyId, outlines, images, sliders,
+      joints, links, bodies, baseBodyId: data.baseBodyId, outlines, images, sliders, colliders,
       viewPreferences: data.viewPreferences,
       simulationSettings: data.simulationSettings,
     };

@@ -43,7 +43,8 @@ interface EditorStore {
   leftCollapsed: boolean;
   rightCollapsed: boolean;
   imageDragMode: 'move' | 'rotate' | 'scale' | null;
-  sliderPointA: { position: Vec2; jointId: string } | null;  // first placed joint of slider
+  sliderPointA: { position: Vec2; jointId: string } | null;
+  colliderPointA: { position: Vec2; jointId: string } | null;
 
   setMode(mode: AppMode): void;
   setTool(tool: ToolType): void;
@@ -75,6 +76,7 @@ interface EditorStore {
   toggleRightCollapsed(): void;
   setImageDragMode(mode: 'move' | 'rotate' | 'scale' | null): void;
   setSliderPointA(point: { position: Vec2; jointId: string } | null): void;
+  setColliderPointA(point: { position: Vec2; jointId: string } | null): void;
   editingOutlineId: string | null;
   editingVertexIndex: number | null;
   setEditingOutline(outlineId: string | null): void;
@@ -110,11 +112,12 @@ export const useEditorStore = create<EditorStore>((set) => ({
   rightCollapsed: false,
   imageDragMode: null,
   sliderPointA: null,
+  colliderPointA: null,
   editingOutlineId: null,
   editingVertexIndex: null,
 
   setMode(mode) {
-    set({ mode, simDrag: null, linkStartJointId: null, selectedIds: new Set(), outlinePoints: [], createTool: 'joints' as CreateTool, jointMode: 'manual' as JointMode, autoChainLastBodyId: null, lockOutlines: true, frozenOutlineWorldPoints: new Map(), sliderPointA: null, editingOutlineId: null, editingVertexIndex: null });
+    set({ mode, simDrag: null, linkStartJointId: null, selectedIds: new Set(), outlinePoints: [], createTool: 'joints' as CreateTool, jointMode: 'manual' as JointMode, autoChainLastBodyId: null, lockOutlines: true, frozenOutlineWorldPoints: new Map(), sliderPointA: null, colliderPointA: null, editingOutlineId: null, editingVertexIndex: null });
   },
 
   setTool(tool) {
@@ -225,7 +228,7 @@ export const useEditorStore = create<EditorStore>((set) => ({
   },
 
   setCreateTool(tool) {
-    set({ createTool: tool, outlinePoints: [], jointMode: 'manual' as JointMode, autoChainLastBodyId: null, sliderPointA: null, editingOutlineId: null, editingVertexIndex: null });
+    set({ createTool: tool, outlinePoints: [], jointMode: 'manual' as JointMode, autoChainLastBodyId: null, sliderPointA: null, colliderPointA: null, editingOutlineId: null, editingVertexIndex: null });
   },
 
   setJointMode(mode) {
@@ -266,6 +269,10 @@ export const useEditorStore = create<EditorStore>((set) => ({
 
   setSliderPointA(point) {
     set({ sliderPointA: point });
+  },
+
+  setColliderPointA(point) {
+    set({ colliderPointA: point });
   },
 
   setEditingOutline(outlineId) {

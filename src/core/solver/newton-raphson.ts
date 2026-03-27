@@ -1,4 +1,4 @@
-import type { Joint, Link, SliderConstraint, AngleConstraint, Vec2, SolverResult, ForceVector } from '../../types';
+import type { Joint, Link, SliderConstraint, ColliderConstraint, AngleConstraint, Vec2, SolverResult, ForceVector } from '../../types';
 import { distanceConstraint, angleDriverConstraint } from './constraints';
 import { createMatrix, solveLU } from '../math/linalg';
 import { SOLVER_MAX_ITERATIONS, SOLVER_TOLERANCE, SOLVER_DAMPING } from '../../utils/constants';
@@ -175,6 +175,9 @@ export function solveWithForce(
   jointGravityWeights?: Map<string, number>,
   sliders?: Record<string, SliderConstraint>,
   angleConstraints?: AngleConstraint[],
+  colliders?: Record<string, ColliderConstraint>,
+  colliderSides?: Map<string, number>,
+  bodiesRef?: Record<string, { jointIds: string[] }>,
 ): SolverResult {
   const freeJoints: Joint[] = [];
   const jointIndex = new Map<string, number>();
@@ -497,6 +500,65 @@ export function solveWithForce(
       // Note: angle constraints were tested but removed — they destabilize
       // near-collinear configurations by fighting distance constraints.
       // Full pairwise distance links provide sufficient rigidity.
+    }
+
+    // 3b. Collider wall enforcement: push joints back if they cross a barrier line.
+    // Each affected joint must stay on its initial side of the collider segment.
+    if (colliders && colliderSides) {
+      for (const collider of Object.values(colliders)) {
+        // Get barrier endpoints (may be fixed or free)
+        const idxA = jointIndex.get(collider.jointIdA);
+        const idxC = jointIndex.get(collider.jointIdC);
+        const ax = idxA !== undefined ? predicted[idxA] : (joints[collider.jointIdA]?.position.x ?? 0);
+        const ay = idxA !== undefined ? predicted[idxA + 1] : (joints[collider.jointIdA]?.position.y ?? 0);
+        const cx = idxC !== undefined ? predicted[idxC] : (joints[collider.jointIdC]?.position.x ?? 0);
+        const cy = idxC !== undefined ? predicted[idxC + 1] : (joints[collider.jointIdC]?.position.y ?? 0);
+
+        const lineDx = cx - ax;
+        const lineDy = cy - ay;
+        const lineLenSq = lineDx * lineDx + lineDy * lineDy;
+        if (lineLenSq < 1e-10) continue;
+        const lineLen = Math.sqrt(lineLenSq);
+        // Unit normal (perpendicular to line, consistent direction)
+        const nx = -lineDy / lineLen;
+        const ny = lineDx / lineLen;
+
+        // Check each joint in the collider's assigned bodies
+        for (const bodyId of collider.bodyIds) {
+          const body = bodiesRef[bodyId];
+          if (!body) continue;
+          for (const jid of body.jointIds) {
+            // Skip the collider's own endpoints
+            if (jid === collider.jointIdA || jid === collider.jointIdC) continue;
+            const idx = jointIndex.get(jid);
+            if (idx === undefined) continue;
+
+            const px = predicted[idx];
+            const py = predicted[idx + 1];
+
+            // Parametric projection onto line segment
+            const apx = px - ax, apy = py - ay;
+            const t = (apx * lineDx + apy * lineDy) / lineLenSq;
+            if (t < 0 || t > 1) continue; // outside segment bounds
+
+            // Signed distance from line (positive = normal side, negative = opposite)
+            const signedDist = apx * nx + apy * ny;
+
+            // Look up initial side
+            const sideKey = `${collider.id}:${jid}`;
+            const initialSide = colliderSides.get(sideKey);
+            if (initialSide === undefined || initialSide === 0) continue;
+
+            // If joint has crossed (sign differs from initial), push it back
+            if (signedDist * initialSide < 0) {
+              // Project onto the line, then offset to original side by a small epsilon
+              const epsilon = 0.5;
+              predicted[idx] = px - signedDist * nx + initialSide * epsilon * nx;
+              predicted[idx + 1] = py - signedDist * ny + initialSide * epsilon * ny;
+            }
+          }
+        }
+      }
     }
 
     // 4. Derive velocity from position change

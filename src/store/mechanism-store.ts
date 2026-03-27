@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Joint, Link, Body, Outline, CanvasImage, SliderConstraint, AngleConstraint, JointType } from '../types';
+import type { Joint, Link, Body, Outline, CanvasImage, SliderConstraint, ColliderConstraint, AngleConstraint, JointType } from '../types';
 import type { Vec2 } from '../types';
 import { createId } from '../utils/id';
 import { generateBodyLinks } from '../core/body-links';
@@ -14,6 +14,7 @@ interface HistorySnapshot {
   outlines: Record<string, Outline>;
   images: Record<string, CanvasImage>;
   sliders: Record<string, SliderConstraint>;
+  colliders: Record<string, ColliderConstraint>;
 }
 
 const BASE_BODY_ID = 'base';
@@ -30,6 +31,7 @@ interface MechanismStore {
   outlines: Record<string, Outline>;
   images: Record<string, CanvasImage>;
   sliders: Record<string, SliderConstraint>;
+  colliders: Record<string, ColliderConstraint>;
   angleConstraints: AngleConstraint[];
 
   past: HistorySnapshot[];
@@ -69,12 +71,18 @@ interface MechanismStore {
   updateSliderT(id: string, t: number): void;
   getSliderForJoint(jointId: string): SliderConstraint | undefined;
 
+  addCollider(jointIdA: string, jointIdC: string): string;
+  removeCollider(id: string): void;
+  addBodyToCollider(colliderId: string, bodyId: string): void;
+  removeBodyFromCollider(colliderId: string, bodyId: string): void;
+  getColliderById(id: string): ColliderConstraint | undefined;
+
   addTempJoint(position: Vec2, bodyId: string): string;
   removeTempJoint(id: string): void;
   reprojectOutlinesFromWorld(frozenWorldPoints: Map<string, Vec2[]>): void;
 
   clearAll(): void;
-  loadState(state: { joints: Record<string, Joint>; links: Record<string, Link>; bodies: Record<string, Body>; baseBodyId: string; outlines: Record<string, Outline>; images?: Record<string, CanvasImage>; sliders?: Record<string, SliderConstraint> }): void;
+  loadState(state: { joints: Record<string, Joint>; links: Record<string, Link>; bodies: Record<string, Body>; baseBodyId: string; outlines: Record<string, Outline>; images?: Record<string, CanvasImage>; sliders?: Record<string, SliderConstraint>; colliders?: Record<string, ColliderConstraint> }): void;
   pushHistory(): void;
   undo(): void;
   redo(): void;
@@ -88,6 +96,7 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
   outlines: {},
   images: {},
   sliders: {},
+  colliders: {},
   angleConstraints: [],
   past: [],
   future: [],
@@ -156,6 +165,45 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
     return Object.values(sliders).find(
       (s) => s.jointIdA === jointId || s.jointIdB === jointId || s.jointIdC === jointId,
     );
+  },
+
+  addCollider(jointIdA, jointIdC) {
+    const id = createId();
+    get().pushHistory();
+    const collider: ColliderConstraint = { id, jointIdA, jointIdC, bodyIds: [] };
+    set((s) => ({ colliders: { ...s.colliders, [id]: collider } }));
+    return id;
+  },
+
+  removeCollider(id) {
+    get().pushHistory();
+    set((s) => {
+      const newColliders = { ...s.colliders };
+      delete newColliders[id];
+      return { colliders: newColliders };
+    });
+  },
+
+  addBodyToCollider(colliderId, bodyId) {
+    get().pushHistory();
+    set((s) => {
+      const collider = s.colliders[colliderId];
+      if (!collider || collider.bodyIds.includes(bodyId)) return s;
+      return { colliders: { ...s.colliders, [colliderId]: { ...collider, bodyIds: [...collider.bodyIds, bodyId] } } };
+    });
+  },
+
+  removeBodyFromCollider(colliderId, bodyId) {
+    get().pushHistory();
+    set((s) => {
+      const collider = s.colliders[colliderId];
+      if (!collider) return s;
+      return { colliders: { ...s.colliders, [colliderId]: { ...collider, bodyIds: collider.bodyIds.filter((id) => id !== bodyId) } } };
+    });
+  },
+
+  getColliderById(id) {
+    return get().colliders[id];
   },
 
   addTempJoint(position, bodyId) {
@@ -253,6 +301,7 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
       outlines: {},
       images: {},
       sliders: {},
+      colliders: {},
       angleConstraints: [],
       past: [],
       future: [],
@@ -260,7 +309,6 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
   },
 
   loadState(state) {
-    // Regenerate angle constraints from loaded body/joint structure
     const sliders = state.sliders || {};
     const { angleConstraints: ac } = generateBodyLinks(state.bodies, state.joints, sliders);
     set({
@@ -271,6 +319,7 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
       outlines: state.outlines,
       images: state.images || {},
       sliders,
+      colliders: state.colliders || {},
       angleConstraints: ac,
       past: [],
       future: [],
@@ -278,15 +327,15 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
   },
 
   pushHistory() {
-    const { joints, links, bodies, baseBodyId, outlines, images, sliders, past } = get();
+    const { joints, links, bodies, baseBodyId, outlines, images, sliders, colliders, past } = get();
     set({
-      past: [...past.slice(-50), { joints: { ...joints }, links: { ...links }, bodies: { ...bodies }, baseBodyId, outlines: { ...outlines }, images: { ...images }, sliders: { ...sliders } }],
+      past: [...past.slice(-50), { joints: { ...joints }, links: { ...links }, bodies: { ...bodies }, baseBodyId, outlines: { ...outlines }, images: { ...images }, sliders: { ...sliders }, colliders: { ...colliders } }],
       future: [],
     });
   },
 
   undo() {
-    const { past, joints, links, bodies, baseBodyId, outlines, images, sliders } = get();
+    const { past, joints, links, bodies, baseBodyId, outlines, images, sliders, colliders } = get();
     if (past.length === 0) return;
     const prev = past[past.length - 1];
     set({
@@ -297,13 +346,14 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
       outlines: prev.outlines,
       images: prev.images || {},
       sliders: prev.sliders || {},
+      colliders: prev.colliders || {},
       past: past.slice(0, -1),
-      future: [{ joints: { ...joints }, links: { ...links }, bodies: { ...bodies }, baseBodyId, outlines: { ...outlines }, images: { ...images }, sliders: { ...sliders } }, ...get().future],
+      future: [{ joints: { ...joints }, links: { ...links }, bodies: { ...bodies }, baseBodyId, outlines: { ...outlines }, images: { ...images }, sliders: { ...sliders }, colliders: { ...colliders } }, ...get().future],
     });
   },
 
   redo() {
-    const { future, joints, links, bodies, baseBodyId, outlines, images, sliders } = get();
+    const { future, joints, links, bodies, baseBodyId, outlines, images, sliders, colliders } = get();
     if (future.length === 0) return;
     const next = future[0];
     set({
@@ -314,8 +364,9 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
       outlines: next.outlines,
       images: next.images || {},
       sliders: next.sliders || {},
+      colliders: next.colliders || {},
       future: future.slice(1),
-      past: [...get().past, { joints: { ...joints }, links: { ...links }, bodies: { ...bodies }, baseBodyId, outlines: { ...outlines }, images: { ...images }, sliders: { ...sliders } }],
+      past: [...get().past, { joints: { ...joints }, links: { ...links }, bodies: { ...bodies }, baseBodyId, outlines: { ...outlines }, images: { ...images }, sliders: { ...sliders }, colliders: { ...colliders } }],
     });
   },
 
