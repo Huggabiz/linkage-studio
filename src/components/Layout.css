@@ -384,6 +384,20 @@
   color: #fff;
 }
 
+.collapsed-tool-btn.delete {
+  color: #E53935;
+}
+
+.collapsed-tool-btn.delete:hover {
+  background: #3a1a1a;
+  color: #ff5252;
+}
+
+.collapsed-tool-btn.delete:disabled {
+  color: #555;
+  cursor: not-allowed;
+}
+
 /* ---- Sim controls ---- */
 
 .sim-controls {
