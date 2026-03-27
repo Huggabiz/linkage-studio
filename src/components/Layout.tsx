@@ -187,7 +187,7 @@ function CollapsedBodyList() {
     <>
       <button
         className="collapsed-add-body"
-        onClick={() => addBody()}
+        onClick={() => addBody('Body')}
         title="Add body"
       >
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
