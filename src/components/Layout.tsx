@@ -75,6 +75,62 @@ const IconImageSmall = () => (
   </svg>
 );
 
+/* ---- Delete button for collapsed toolbar ---- */
+function CollapsedDeleteButton() {
+  const joints = useMechanismStore((s) => s.joints);
+  const outlines = useMechanismStore((s) => s.outlines);
+  const images = useMechanismStore((s) => s.images);
+  const removeJoint = useMechanismStore((s) => s.removeJoint);
+  const removeOutline = useMechanismStore((s) => s.removeOutline);
+  const removeImage = useMechanismStore((s) => s.removeImage);
+  const removeOutlineVertex = useMechanismStore((s) => s.removeOutlineVertex);
+  const selectedIds = useEditorStore((s) => s.selectedIds);
+  const clearSelection = useEditorStore((s) => s.clearSelection);
+  const editingOutlineId = useEditorStore((s) => s.editingOutlineId);
+  const editingVertexIndex = useEditorStore((s) => s.editingVertexIndex);
+  const setEditingVertexIndex = useEditorStore((s) => s.setEditingVertexIndex);
+
+  const hasVertexSelection = editingOutlineId !== null && editingVertexIndex !== null;
+  const canDeleteVertex = hasVertexSelection && (() => {
+    const outline = outlines[editingOutlineId!];
+    return outline && outline.points.length > 3;
+  })();
+
+  const handleDelete = () => {
+    if (hasVertexSelection && canDeleteVertex) {
+      removeOutlineVertex(editingOutlineId!, editingVertexIndex!);
+      setEditingVertexIndex(null);
+      return;
+    }
+    for (const id of selectedIds) {
+      if (joints[id]) removeJoint(id);
+      else if (outlines[id]) removeOutline(id);
+      else if (images[id]) removeImage(id);
+    }
+    clearSelection();
+  };
+
+  const isDisabled = hasVertexSelection && !canDeleteVertex;
+  const title = hasVertexSelection ? 'Delete vertex' : 'Delete selected';
+
+  return (
+    <button
+      className="collapsed-tool-btn delete"
+      onClick={handleDelete}
+      disabled={isDisabled}
+      title={title}
+    >
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 5H15" />
+        <path d="M5 5V15C5 15.6 5.4 16 6 16H12C12.6 16 13 15.6 13 15V5" />
+        <path d="M7 3V2H11V3" />
+        <line x1="8" y1="8" x2="8" y2="13" />
+        <line x1="10" y1="8" x2="10" y2="13" />
+      </svg>
+    </button>
+  );
+}
+
 /* ---- Mini body list for collapsed right panel ---- */
 function CollapsedBodyList() {
   const bodies = useMechanismStore((s) => s.bodies);
@@ -176,6 +232,9 @@ export function Layout() {
   const setCreateTool = useEditorStore((s) => s.setCreateTool);
   const addImage = useMechanismStore((s) => s.addImage);
   const baseBodyId = useMechanismStore((s) => s.baseBodyId);
+  const selectedIds = useEditorStore((s) => s.selectedIds);
+  const editingOutlineId = useEditorStore((s) => s.editingOutlineId);
+  const editingVertexIndex = useEditorStore((s) => s.editingVertexIndex);
 
   const handleImportImage = () => {
     const input = document.createElement('input');
@@ -279,6 +338,14 @@ export function Layout() {
                 >
                   <IconImageSmall />
                 </button>
+
+                {/* Delete button — shown when a joint/outline/image or vertex is selected */}
+                {(selectedIds.size > 0 || (editingOutlineId !== null && editingVertexIndex !== null)) && (
+                  <>
+                    <div className="collapsed-divider" />
+                    <CollapsedDeleteButton />
+                  </>
+                )}
               </>
             )}
           </div>
