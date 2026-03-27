@@ -18,6 +18,7 @@ export function TopBar() {
   const outlines = useMechanismStore((s) => s.outlines);
   const images = useMechanismStore((s) => s.images);
   const sliders = useMechanismStore((s) => s.sliders);
+  const colliders = useMechanismStore((s) => s.colliders);
   const baseBodyId = useMechanismStore((s) => s.baseBodyId);
   const clearSelection = useEditorStore((s) => s.clearSelection);
   const mode = useEditorStore((s) => s.mode);
@@ -44,7 +45,7 @@ export function TopBar() {
       dragDamping: sim.dragDamping,
     };
 
-    const json = serializeMechanism(joints, links, bodies, baseBodyId, outlines, images, sliders, viewPreferences, simulationSettings);
+    const json = serializeMechanism(joints, links, bodies, baseBodyId, outlines, images, sliders, colliders, viewPreferences, simulationSettings);
     const timestamp = new Date().toISOString().slice(0, 16).replace(/[:-]/g, '');
     await saveFileAs(json, `linkage_${timestamp}.slinker`);
   };

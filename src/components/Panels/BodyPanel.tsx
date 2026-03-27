@@ -69,10 +69,16 @@ export function BodyPanel() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [collapsedBodies, setCollapsedBodies] = useState<Set<string>>(new Set());
 
+  const colliders = useMechanismStore((s) => s.colliders);
+  const addBodyToCollider = useMechanismStore((s) => s.addBodyToCollider);
+  const removeBodyFromCollider = useMechanismStore((s) => s.removeBodyFromCollider);
+
   const usedColors = new Set(Object.values(bodies).map((b) => b.color));
   const isOutlineMode = createTool === 'outline';
 
   const selectedJointId = [...selectedIds].find((id) => joints[id]);
+  const selectedColliderId = [...selectedIds].find((id) => colliders[id]);
+  const selectedCollider = selectedColliderId ? colliders[selectedColliderId] : null;
 
   const bodyList = Object.values(bodies);
   bodyList.sort((a, b) => {
@@ -107,6 +113,7 @@ export function BodyPanel() {
         const isBase = body.id === baseBodyId;
         const isEditing = editingId === body.id;
         const jointInBody = selectedJointId ? body.jointIds.includes(selectedJointId) : false;
+        const colliderHasBody = selectedCollider ? selectedCollider.bodyIds.includes(body.id) : false;
         const bodyOutlines = Object.values(outlines).filter((o) => o.bodyId === body.id);
         const bodyImages = Object.values(images).filter((img) => img.bodyId === body.id);
         const hasChildren = bodyOutlines.length > 0 || bodyImages.length > 0;
@@ -122,7 +129,16 @@ export function BodyPanel() {
                 backgroundColor: isActive ? 'rgba(255,255,255,0.1)' : 'transparent',
                 cursor: 'pointer',
               }}
-              onClick={() => isOutlineMode ? setActiveBody(body.id) : toggleActiveBody(body.id)}
+              onClick={() => {
+                if (isOutlineMode) setActiveBody(body.id);
+                else if (selectedColliderId) {
+                  if (colliderHasBody) removeBodyFromCollider(selectedColliderId, body.id);
+                  else addBodyToCollider(selectedColliderId, body.id);
+                } else if (selectedJointId) {
+                  if (jointInBody) removeJointFromBody(selectedJointId, body.id);
+                  else addJointToBody(selectedJointId, body.id);
+                } else toggleActiveBody(body.id);
+              }}
             >
               {/* Collapse chevron */}
               {hasChildren ? (
@@ -149,10 +165,13 @@ export function BodyPanel() {
               ) : (
                 <input
                   type="checkbox"
-                  checked={selectedJointId ? jointInBody : isActive}
+                  checked={selectedColliderId ? colliderHasBody : selectedJointId ? jointInBody : isActive}
                   onChange={(e) => {
                     e.stopPropagation();
-                    if (selectedJointId) {
+                    if (selectedColliderId) {
+                      if (colliderHasBody) removeBodyFromCollider(selectedColliderId, body.id);
+                      else addBodyToCollider(selectedColliderId, body.id);
+                    } else if (selectedJointId) {
                       if (jointInBody) removeJointFromBody(selectedJointId, body.id);
                       else addJointToBody(selectedJointId, body.id);
                     } else {

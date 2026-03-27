@@ -73,6 +73,20 @@ export interface AngleConstraint {
   restAngle: number; // radians — the angle ABC at design time
 }
 
+/**
+ * Collider constraint: a barrier line between joints A and C.
+ * Joints in the assigned bodies cannot cross this line segment.
+ * Endpoints A and C are regular joints (can be on any body).
+ * The barrier's bodyIds determines which bodies' joints are blocked.
+ */
+export interface ColliderConstraint {
+  readonly id: string;
+  jointIdA: string;
+  jointIdC: string;
+  /** Bodies whose joints are blocked by this barrier */
+  bodyIds: string[];
+}
+
 export interface MechanismState {
   joints: Record<string, Joint>;
   links: Record<string, Link>;
@@ -81,4 +95,5 @@ export interface MechanismState {
   outlines: Record<string, Outline>;
   images: Record<string, CanvasImage>;
   sliders: Record<string, SliderConstraint>;
+  colliders: Record<string, ColliderConstraint>;
 }

@@ -1,7 +1,7 @@
-import type { Joint, Link, Body, Outline, CanvasImage, SliderConstraint, Vec2, SimDragState, AppMode, ForceVector, CreateTool } from '../types';
+import type { Joint, Link, Body, Outline, CanvasImage, SliderConstraint, ColliderConstraint, Vec2, SimDragState, AppMode, ForceVector, CreateTool } from '../types';
 import type { CameraState } from '../types';
 import { applyCamera, resetCamera } from './camera';
-import { drawMechanism, drawOutlineGhost, drawSliderGhost, drawOutlineEditMode } from './draw-mechanism';
+import { drawMechanism, drawOutlineGhost, drawSliderGhost, drawColliderGhost, drawOutlineEditMode } from './draw-mechanism';
 import { drawImages } from './draw-images';
 import { drawGrid, drawRulers, drawPathTraces, drawForceVectors, drawDragInteraction, drawModeBadge, drawHUD, clearCanvas, drawCOMMarkers } from './draw-overlays';
 import { lerp } from '../core/math/vec2';
@@ -14,6 +14,7 @@ export interface RenderState {
   outlines: Record<string, Outline>;
   images: Record<string, CanvasImage>;
   sliders: Record<string, SliderConstraint>;
+  colliders: Record<string, ColliderConstraint>;
   selectedIds: Set<string>;
   hoveredId: string | null;
   camera: CameraState;
@@ -37,6 +38,7 @@ export interface RenderState {
   baseBodyId: string;
   frozenOutlinePoints?: Map<string, Vec2[]>;
   sliderPointA?: Vec2 | null;
+  colliderPointA?: Vec2 | null;
   editingOutlineId?: string | null;
   editingVertexIndex?: number | null;
 }
@@ -65,7 +67,7 @@ export function render(
     frozenPts = new Map(frozenPts);
     frozenPts.delete(state.editingOutlineId);
   }
-  drawMechanism(ctx, state.joints, state.links, state.bodies, state.outlines, state.sliders, state.selectedIds, state.hoveredId, state.camera.zoom, state.showLinks, state.baseBodyId, frozenPts);
+  drawMechanism(ctx, state.joints, state.links, state.bodies, state.outlines, state.sliders, state.colliders, state.selectedIds, state.hoveredId, state.camera.zoom, state.showLinks, state.baseBodyId, frozenPts);
 
   drawPathTraces(ctx, state.pathTraces, state.camera.zoom);
 
@@ -90,6 +92,11 @@ export function render(
   // Slider ghost (placing second point)
   if (state.mode === 'create' && state.createTool === 'slider' && state.sliderPointA) {
     drawSliderGhost(ctx, state.sliderPointA, state.cursorWorld, state.camera.zoom);
+  }
+
+  // Collider ghost (placing second point)
+  if (state.mode === 'create' && state.createTool === 'collider' && state.colliderPointA) {
+    drawColliderGhost(ctx, state.colliderPointA, state.cursorWorld, state.camera.zoom);
   }
 
   if (state.mode === 'simulate' && state.forceVectors.length > 0 && state.showVectors) {

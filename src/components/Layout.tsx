@@ -67,6 +67,14 @@ const IconOutlineSmall = () => (
   </svg>
 );
 
+const IconColliderSmall = () => (
+  <svg width="18" height="18" viewBox="0 0 16 16">
+    <line x1="2" y1="13" x2="14" y2="3" stroke="currentColor" strokeWidth="1.3" strokeDasharray="3 2" />
+    <line x1="1" y1="11" x2="3" y2="15" stroke="currentColor" strokeWidth="1" />
+    <line x1="13" y1="1" x2="15" y2="5" stroke="currentColor" strokeWidth="1" />
+  </svg>
+);
+
 const IconImageSmall = () => (
   <svg width="18" height="18" viewBox="0 0 16 16">
     <rect x="2" y="3" width="12" height="10" rx="1.2" fill="none" stroke="currentColor" strokeWidth="1.2" />
@@ -135,10 +143,13 @@ function CollapsedDeleteButton() {
 function CollapsedBodyList() {
   const bodies = useMechanismStore((s) => s.bodies);
   const joints = useMechanismStore((s) => s.joints);
+  const colliders = useMechanismStore((s) => s.colliders);
   const baseBodyId = useMechanismStore((s) => s.baseBodyId);
   const addBody = useMechanismStore((s) => s.addBody);
   const addJointToBody = useMechanismStore((s) => s.addJointToBody);
   const removeJointFromBody = useMechanismStore((s) => s.removeJointFromBody);
+  const addBodyToCollider = useMechanismStore((s) => s.addBodyToCollider);
+  const removeBodyFromCollider = useMechanismStore((s) => s.removeBodyFromCollider);
   const activeBodyIds = useEditorStore((s) => s.activeBodyIds);
   const toggleActiveBody = useEditorStore((s) => s.toggleActiveBody);
   const setActiveBody = useEditorStore((s) => s.setActiveBody);
@@ -147,6 +158,8 @@ function CollapsedBodyList() {
 
   const isOutlineMode = createTool === 'outline';
   const selectedJointId = [...selectedIds].find((id) => joints[id]);
+  const selectedColliderId = [...selectedIds].find((id) => colliders[id]);
+  const selectedCollider = selectedColliderId ? colliders[selectedColliderId] : null;
 
   const bodyList = Object.values(bodies);
   bodyList.sort((a, b) => {
@@ -157,29 +170,23 @@ function CollapsedBodyList() {
 
   const handleBodyClick = (bodyId: string) => {
     if (isOutlineMode) {
-      // Radio: single-select for shape assignment
       setActiveBody(bodyId);
+    } else if (selectedColliderId && selectedCollider) {
+      if (selectedCollider.bodyIds.includes(bodyId)) removeBodyFromCollider(selectedColliderId, bodyId);
+      else addBodyToCollider(selectedColliderId, bodyId);
     } else if (selectedJointId) {
-      // Joint selected: toggle membership
       const body = bodies[bodyId];
-      if (body.jointIds.includes(selectedJointId)) {
-        removeJointFromBody(selectedJointId, bodyId);
-      } else {
-        addJointToBody(selectedJointId, bodyId);
-      }
+      if (body.jointIds.includes(selectedJointId)) removeJointFromBody(selectedJointId, bodyId);
+      else addJointToBody(selectedJointId, bodyId);
     } else {
-      // No joint selected: toggle active body
       toggleActiveBody(bodyId);
     }
   };
 
   const isChecked = (bodyId: string): boolean => {
-    if (isOutlineMode) {
-      return activeBodyIds.has(bodyId);
-    }
-    if (selectedJointId) {
-      return bodies[bodyId]?.jointIds.includes(selectedJointId) ?? false;
-    }
+    if (isOutlineMode) return activeBodyIds.has(bodyId);
+    if (selectedColliderId && selectedCollider) return selectedCollider.bodyIds.includes(bodyId);
+    if (selectedJointId) return bodies[bodyId]?.jointIds.includes(selectedJointId) ?? false;
     return activeBodyIds.has(bodyId);
   };
 
@@ -312,6 +319,13 @@ export function Layout() {
                   title="Slider joint"
                 >
                   <IconSliderSmall />
+                </button>
+                <button
+                  className={`collapsed-tool-btn ${createTool === 'collider' ? 'active' : ''}`}
+                  onClick={() => setCreateTool('collider')}
+                  title="Collider barrier"
+                >
+                  <IconColliderSmall />
                 </button>
 
                 <div className="collapsed-divider" />

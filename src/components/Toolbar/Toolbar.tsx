@@ -33,6 +33,14 @@ const IconSlider = () => (
   </svg>
 );
 
+const IconCollider = () => (
+  <svg className="tool-icon-svg" viewBox="0 0 16 16" width="16" height="16">
+    <line x1="2" y1="13" x2="14" y2="3" stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 2" />
+    <line x1="1" y1="11" x2="3" y2="15" stroke="currentColor" strokeWidth="1.2" />
+    <line x1="13" y1="1" x2="15" y2="5" stroke="currentColor" strokeWidth="1.2" />
+  </svg>
+);
+
 const IconOutline = () => (
   <svg className="tool-icon-svg" viewBox="0 0 16 16" width="16" height="16">
     <polygon points="8,1 14,5 12,13 4,13 2,5" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
@@ -125,7 +133,8 @@ export function Toolbar() {
 
   const isPivotTool = createTool === 'joints';
   const isSliderTool = createTool === 'slider';
-  const isJointsTool = isPivotTool || isSliderTool;
+  const isColliderTool = createTool === 'collider';
+  const isJointsTool = isPivotTool || isSliderTool || isColliderTool;
 
   const renderHints = () => {
     if (isPivotTool && jointMode === 'manual') {
@@ -152,6 +161,16 @@ export function Toolbar() {
           <div className="sim-hint">Click to place end A</div>
           <div className="sim-hint">Click again to place end C</div>
           <div className="sim-hint">Slider B auto-placed at midpoint</div>
+          <div className="sim-hint">Escape to cancel</div>
+        </>
+      );
+    }
+    if (isColliderTool) {
+      return (
+        <>
+          <div className="sim-hint">Click to place end A</div>
+          <div className="sim-hint">Click again to place end C</div>
+          <div className="sim-hint">Select barrier line to assign bodies</div>
           <div className="sim-hint">Escape to cancel</div>
         </>
       );
@@ -226,6 +245,14 @@ export function Toolbar() {
             >
               <IconSlider />
               <span className="tool-name">Slider</span>
+            </button>
+
+            <button
+              className={`tool-btn ${isColliderTool ? 'active' : ''}`}
+              onClick={() => setCreateTool('collider')}
+            >
+              <IconCollider />
+              <span className="tool-name">Collider</span>
             </button>
 
             {/* Shapes group */}

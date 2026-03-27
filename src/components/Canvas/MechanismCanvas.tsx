@@ -59,6 +59,7 @@ export function MechanismCanvas() {
         outlines: mechanism.outlines,
         images: mechanism.images,
         sliders: mechanism.sliders,
+        colliders: mechanism.colliders,
         selectedIds: editor.selectedIds,
         hoveredId: editor.hoveredId,
         camera: editor.camera,
@@ -85,6 +86,7 @@ export function MechanismCanvas() {
         baseBodyId: mechanism.baseBodyId,
         frozenOutlinePoints: editor.lockOutlines ? editor.frozenOutlineWorldPoints : undefined,
         sliderPointA: editor.sliderPointA?.position ?? null,
+        colliderPointA: editor.colliderPointA?.position ?? null,
         editingOutlineId: editor.editingOutlineId,
         editingVertexIndex: editor.editingVertexIndex,
       });

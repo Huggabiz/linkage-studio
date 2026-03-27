@@ -1,4 +1,4 @@
-import type { Joint, Link, Body, Outline, SliderConstraint, Vec2 } from '../types';
+import type { Joint, Link, Body, Outline, SliderConstraint, ColliderConstraint, Vec2 } from '../types';
 import { computeBodyTransform, localToWorld } from '../core/body-transform';
 import {
   JOINT_RADIUS, JOINT_RADIUS_FIXED, LINK_WIDTH,
@@ -159,6 +159,84 @@ export function drawSliderGhost(
   ctx.stroke();
 }
 
+/** Draw collider barrier lines (dashed black) with thin body-color rings for assigned bodies. */
+export function drawColliderLines(
+  ctx: CanvasRenderingContext2D,
+  colliders: Record<string, ColliderConstraint>,
+  joints: Record<string, Joint>,
+  bodies: Record<string, Body>,
+  zoom: number,
+  selectedIds: Set<string>,
+) {
+  for (const collider of Object.values(colliders)) {
+    const jA = joints[collider.jointIdA];
+    const jC = joints[collider.jointIdC];
+    if (!jA || !jC) continue;
+    const isSelected = selectedIds.has(collider.id);
+
+    // Draw body-color border strips (thin, along the line)
+    const dx = jC.position.x - jA.position.x;
+    const dy = jC.position.y - jA.position.y;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if (len < 1e-6) continue;
+    const nx = -dy / len; // perpendicular normal
+    const ny = dx / len;
+
+    for (let i = 0; i < collider.bodyIds.length; i++) {
+      const body = bodies[collider.bodyIds[i]];
+      if (!body) continue;
+      const offset = (i + 1) * 2.5 / zoom;
+      ctx.beginPath();
+      ctx.moveTo(jA.position.x + nx * offset, jA.position.y + ny * offset);
+      ctx.lineTo(jC.position.x + nx * offset, jC.position.y + ny * offset);
+      ctx.moveTo(jA.position.x - nx * offset, jA.position.y - ny * offset);
+      ctx.lineTo(jC.position.x - nx * offset, jC.position.y - ny * offset);
+      ctx.strokeStyle = body.color;
+      ctx.lineWidth = 1.2 / zoom;
+      ctx.stroke();
+    }
+
+    // Main barrier line (dashed black)
+    ctx.beginPath();
+    ctx.moveTo(jA.position.x, jA.position.y);
+    ctx.lineTo(jC.position.x, jC.position.y);
+    ctx.strokeStyle = isSelected ? SELECTION_COLOR : '#222';
+    ctx.lineWidth = (isSelected ? 3 : 2) / zoom;
+    ctx.setLineDash([6 / zoom, 4 / zoom]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+}
+
+/** Draw ghost preview during collider placement (A placed, cursor = C). */
+export function drawColliderGhost(
+  ctx: CanvasRenderingContext2D,
+  pointA: Vec2,
+  cursorWorld: Vec2 | null,
+  zoom: number,
+) {
+  if (!cursorWorld) return;
+
+  // Dashed black barrier line preview
+  ctx.beginPath();
+  ctx.moveTo(pointA.x, pointA.y);
+  ctx.lineTo(cursorWorld.x, cursorWorld.y);
+  ctx.strokeStyle = '#222';
+  ctx.lineWidth = 2 / zoom;
+  ctx.setLineDash([6 / zoom, 4 / zoom]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Ghost C at cursor
+  ctx.beginPath();
+  ctx.arc(cursorWorld.x, cursorWorld.y, 6 / zoom, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(100, 100, 100, 0.5)';
+  ctx.fill();
+  ctx.strokeStyle = '#666';
+  ctx.lineWidth = 1.5 / zoom;
+  ctx.stroke();
+}
+
 export function drawMechanism(
   ctx: CanvasRenderingContext2D,
   joints: Record<string, Joint>,
@@ -166,6 +244,7 @@ export function drawMechanism(
   bodies: Record<string, Body>,
   outlines: Record<string, Outline>,
   sliders: Record<string, SliderConstraint>,
+  colliders: Record<string, ColliderConstraint>,
   selectedIds: Set<string>,
   hoveredId: string | null,
   zoom: number,
@@ -227,6 +306,9 @@ export function drawMechanism(
 
   // Draw slider rails
   drawSliderRails(ctx, sliders, joints, zoom, selectedIds);
+
+  // Draw collider barrier lines
+  drawColliderLines(ctx, colliders, joints, bodies, zoom, selectedIds);
 
   // Draw outlines (use frozen points if outlines are locked)
   drawOutlines(ctx, Object.values(outlines), bodies, joints, zoom, selectedIds, frozenOutlinePoints);
