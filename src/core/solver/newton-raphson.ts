@@ -541,13 +541,20 @@ export function solveWithForce(
             // Parametric projection onto line segment
             const apx = px - ax, apy = py - ay;
             const t = (apx * lineDx + apy * lineDy) / lineLenSq;
-            if (t < 0 || t > 1) continue; // outside segment bounds
 
             // Signed distance from line (positive = normal side, negative = opposite)
             const signedDist = apx * nx + apy * ny;
-
-            // Look up initial side
             const sideKey = `${collider.id}:${jid}`;
+
+            if (t < 0 || t > 1) {
+              // Outside segment bounds — joint has gone around the endpoint.
+              // Update the recorded side so re-entering from this side is accepted.
+              const newSide = signedDist > 0 ? 1 : signedDist < 0 ? -1 : 0;
+              if (newSide !== 0) colliderSides.set(sideKey, newSide);
+              continue;
+            }
+
+            // Look up current recorded side
             const initialSide = colliderSides.get(sideKey);
             if (initialSide === undefined || initialSide === 0) continue;
 
