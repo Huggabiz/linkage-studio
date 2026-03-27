@@ -51,15 +51,22 @@ function App() {
         if (bodiesWithCOM.length > 0 && sim.gravityEnabled) {
           jointGravityWeights = new Map();
           for (const body of bodiesWithCOM) {
-            const bodyOutlines = Object.values(mech.outlines).filter((o) => o.bodyId === body.id);
+            const bodyOutlines = Object.values(mech.outlines).filter((o) => o.bodyId === body.id && o.points.length >= 3);
             if (bodyOutlines.length === 0) continue;
 
             const transform = computeBodyTransform(body, mech.joints);
-            const allWorldPts = bodyOutlines.flatMap((o) => o.points.map((p) => localToWorld(p, transform)));
-            const com = polygonCentroid(allWorldPts);
-
-            // Compute area-based mass multiplier (area / 1000 so it scales reasonably)
-            const area = polygonArea(allWorldPts);
+            // Area-weighted centroid across all outlines for this body
+            let totalArea = 0, comX = 0, comY = 0;
+            for (const outline of bodyOutlines) {
+              const worldPts = outline.points.map((p) => localToWorld(p, transform));
+              const a = polygonArea(worldPts);
+              const c = polygonCentroid(worldPts);
+              totalArea += a;
+              comX += c.x * a;
+              comY += c.y * a;
+            }
+            const com = totalArea > 1e-10 ? { x: comX / totalArea, y: comY / totalArea } : polygonCentroid(bodyOutlines[0].points.map((p) => localToWorld(p, transform)));
+            const area = totalArea;
             const massMult = Math.max(0.1, area / 1000);
 
             // Find free joints in this body
