@@ -108,15 +108,23 @@ export function render(
     const comPositions: { pos: Vec2; color: string; gravityForce: Vec2 | null }[] = [];
     for (const body of Object.values(state.bodies)) {
       if (!body.useOutlineCOM) continue;
-      const bodyOutlines = Object.values(state.outlines).filter((o) => o.bodyId === body.id);
+      const bodyOutlines = Object.values(state.outlines).filter((o) => o.bodyId === body.id && o.points.length >= 3);
       if (bodyOutlines.length === 0) continue;
       const transform = computeBodyTransform(body, state.joints);
-      const allWorldPts = bodyOutlines.flatMap((o) => o.points.map((p) => localToWorld(p, transform)));
-      const com = polygonCentroid(allWorldPts);
-      // Scale gravity vector by area-based mass (matching physics calculation)
+      // Area-weighted centroid across all outlines for this body
+      let totalArea = 0, comX = 0, comY = 0;
+      for (const outline of bodyOutlines) {
+        const worldPts = outline.points.map((p) => localToWorld(p, transform));
+        const a = polygonArea(worldPts);
+        const c = polygonCentroid(worldPts);
+        totalArea += a;
+        comX += c.x * a;
+        comY += c.y * a;
+      }
+      const com = totalArea > 1e-10 ? { x: comX / totalArea, y: comY / totalArea } : polygonCentroid(bodyOutlines[0].points.map((p) => localToWorld(p, transform)));
       let gravityForce: Vec2 | null = null;
       if (state.gravityEnabled) {
-        const area = polygonArea(allWorldPts);
+        const area = totalArea;
         const massMult = Math.max(0.1, area / 1000);
         gravityForce = { x: 0, y: state.gravityStrength * massMult * 0.005 };
       }

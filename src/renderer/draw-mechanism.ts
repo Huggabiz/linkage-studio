@@ -193,7 +193,9 @@ export function drawColliderLines(
       ctx.lineTo(jC.position.x - nx * offset, jC.position.y - ny * offset);
       ctx.strokeStyle = body.color;
       ctx.lineWidth = 1.2 / zoom;
+      ctx.setLineDash([4 / zoom, 3 / zoom]);
       ctx.stroke();
+      ctx.setLineDash([]);
     }
 
     // Main barrier line (dashed black)

@@ -602,6 +602,8 @@ export function solveWithForce(
     const jA = joints[link.jointIds[0]];
     const jB = joints[link.jointIds[1]];
     if (!jA || !jB) continue;
+    // Skip links involving hidden bracing joints
+    if (jA.hidden || jB.hidden) continue;
 
     const idxA = jointIndex.get(jA.id);
     const idxB = jointIndex.get(jB.id);
