@@ -78,10 +78,19 @@ const IconImageSmall = () => (
 /* ---- Mini body list for collapsed right panel ---- */
 function CollapsedBodyList() {
   const bodies = useMechanismStore((s) => s.bodies);
+  const joints = useMechanismStore((s) => s.joints);
   const baseBodyId = useMechanismStore((s) => s.baseBodyId);
   const addBody = useMechanismStore((s) => s.addBody);
+  const addJointToBody = useMechanismStore((s) => s.addJointToBody);
+  const removeJointFromBody = useMechanismStore((s) => s.removeJointFromBody);
   const activeBodyIds = useEditorStore((s) => s.activeBodyIds);
   const toggleActiveBody = useEditorStore((s) => s.toggleActiveBody);
+  const setActiveBody = useEditorStore((s) => s.setActiveBody);
+  const selectedIds = useEditorStore((s) => s.selectedIds);
+  const createTool = useEditorStore((s) => s.createTool);
+
+  const isOutlineMode = createTool === 'outline';
+  const selectedJointId = [...selectedIds].find((id) => joints[id]);
 
   const bodyList = Object.values(bodies);
   bodyList.sort((a, b) => {
@@ -89,6 +98,34 @@ function CollapsedBodyList() {
     if (b.id === baseBodyId) return 1;
     return 0;
   });
+
+  const handleBodyClick = (bodyId: string) => {
+    if (isOutlineMode) {
+      // Radio: single-select for shape assignment
+      setActiveBody(bodyId);
+    } else if (selectedJointId) {
+      // Joint selected: toggle membership
+      const body = bodies[bodyId];
+      if (body.jointIds.includes(selectedJointId)) {
+        removeJointFromBody(selectedJointId, bodyId);
+      } else {
+        addJointToBody(selectedJointId, bodyId);
+      }
+    } else {
+      // No joint selected: toggle active body
+      toggleActiveBody(bodyId);
+    }
+  };
+
+  const isChecked = (bodyId: string): boolean => {
+    if (isOutlineMode) {
+      return activeBodyIds.has(bodyId);
+    }
+    if (selectedJointId) {
+      return bodies[bodyId]?.jointIds.includes(selectedJointId) ?? false;
+    }
+    return activeBodyIds.has(bodyId);
+  };
 
   return (
     <>
@@ -103,24 +140,28 @@ function CollapsedBodyList() {
         </svg>
       </button>
       <div className="collapsed-divider-h" />
-      {bodyList.map((body) => (
-        <button
-          key={body.id}
-          className={`collapsed-body-dot ${activeBodyIds.has(body.id) ? 'active' : ''}`}
-          onClick={() => toggleActiveBody(body.id)}
-          title={body.name}
-        >
-          <span
-            className="body-dot"
-            style={{ background: body.color }}
-          />
-          {activeBodyIds.has(body.id) && (
-            <svg width="8" height="8" viewBox="0 0 10 10" className="body-check">
-              <polyline points="2,5 4.5,8 8,2" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          )}
-        </button>
-      ))}
+      {bodyList.map((body) => {
+        const checked = isChecked(body.id);
+        return (
+          <button
+            key={body.id}
+            className={`collapsed-body-dot ${checked ? 'active' : ''}`}
+            onClick={() => handleBodyClick(body.id)}
+            title={body.name}
+          >
+            <span className="body-dot" style={{ background: body.color }} />
+            {checked && (
+              <svg width="8" height="8" viewBox="0 0 10 10" className="body-check">
+                {isOutlineMode ? (
+                  <circle cx="5" cy="5" r="3" fill="#fff" />
+                ) : (
+                  <polyline points="2,5 4.5,8 8,2" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                )}
+              </svg>
+            )}
+          </button>
+        );
+      })}
     </>
   );
 }
