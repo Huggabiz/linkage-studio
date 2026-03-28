@@ -84,10 +84,12 @@ interface EditorStore {
 
   /** Long-press arc body selector state */
   arcSelector: {
-    jointId: string;
+    /** Joint ID when assigning joint body membership */
+    jointId: string | null;
+    /** Collider ID when assigning collider barrier bodies */
+    colliderId: string | null;
     position: Vec2;
     showTime: number;
-    /** If set, the arc is collapsing (reverse animation). Null while expanding. */
     collapseTime: number | null;
     readyToToggle: Set<string>;
   } | null;

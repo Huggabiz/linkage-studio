@@ -19,6 +19,7 @@ function startArcTimer(jointId: string, screenX: number, screenY: number) {
       if (j && !j.hidden) {
         useEditorStore.getState().setArcSelector({
           jointId: longPressJointId,
+          colliderId: null,
           position: { ...j.position },
           showTime: Date.now(),
           collapseTime: null,
@@ -27,6 +28,28 @@ function startArcTimer(jointId: string, screenX: number, screenY: number) {
         isDragging = false;
         dragJointId = null;
       }
+    }
+    longPressTimer = null;
+  }, LONG_PRESS_MS);
+}
+
+/** Start the long-press arc selector timer for a collider barrier line. */
+function startColliderArcTimer(colliderId: string, worldPos: Vec2, screenX: number, screenY: number) {
+  longPressStartScreen = { x: screenX, y: screenY };
+  longPressJointId = colliderId; // reuse for cancel tracking
+  if (longPressTimer) clearTimeout(longPressTimer);
+  longPressTimer = setTimeout(() => {
+    const mech = useMechanismStore.getState();
+    const collider = mech.colliders[colliderId];
+    if (collider) {
+      useEditorStore.getState().setArcSelector({
+        jointId: null,
+        colliderId,
+        position: { ...worldPos },
+        showTime: Date.now(),
+        collapseTime: null,
+        readyToToggle: new Set(Object.keys(mech.bodies)),
+      });
     }
     longPressTimer = null;
   }, LONG_PRESS_MS);
@@ -95,15 +118,27 @@ function handleArcHover(worldPos: Vec2, editor: ReturnType<typeof useEditorStore
     if (dist < CIRCLE_RADIUS) {
       // Cursor is inside this circle — toggle if ready
       if (arc.readyToToggle.has(body.id)) {
-        const joint = mechanism.joints[arc.jointId];
-        if (joint) {
-          if (body.jointIds.includes(arc.jointId)) {
-            mechanism.removeJointFromBody(arc.jointId, body.id);
-          } else {
-            mechanism.addJointToBody(arc.jointId, body.id);
+        if (arc.colliderId) {
+          // Collider mode: toggle barrier body assignment
+          const collider = mechanism.colliders[arc.colliderId];
+          if (collider) {
+            if (collider.bodyIds.includes(body.id)) {
+              mechanism.removeBodyFromCollider(arc.colliderId, body.id);
+            } else {
+              mechanism.addBodyToCollider(arc.colliderId, body.id);
+            }
+          }
+        } else if (arc.jointId) {
+          // Joint mode: toggle joint body membership
+          const joint = mechanism.joints[arc.jointId];
+          if (joint) {
+            if (body.jointIds.includes(arc.jointId)) {
+              mechanism.removeJointFromBody(arc.jointId, body.id);
+            } else {
+              mechanism.addJointToBody(arc.jointId, body.id);
+            }
           }
         }
-        // Mark as not ready until cursor leaves
         const newReady = new Set(arc.readyToToggle);
         newReady.delete(body.id);
         editor.setArcSelector({ ...arc, readyToToggle: newReady });
@@ -442,6 +477,7 @@ export function handleMouseDown(e: PointerEvent, canvas: HTMLCanvasElement) {
         const dist = distance(worldPos, closest);
         if (dist < HIT_RADIUS / editor.camera.zoom) {
           editor.select(collider.id);
+          startColliderArcTimer(collider.id, closest, e.clientX, e.clientY);
           return;
         }
       }
