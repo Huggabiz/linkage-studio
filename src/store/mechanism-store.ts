@@ -453,15 +453,17 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
     const newJoints = { ...get().joints, [id]: joint };
     const newBodies = { ...get().bodies };
 
-    // Add to specified bodies, reprojecting outlines to preserve world positions
+    // Add to specified bodies, reprojecting outlines and tracers to preserve world positions
     const oldBodies = get().bodies;
     const newOutlines = { ...get().outlines };
+    const newTracers = { ...get().tracers };
     if (bodyIds) {
       for (const bodyId of bodyIds) {
         if (newBodies[bodyId]) {
           const oldBody = oldBodies[bodyId];
           newBodies[bodyId] = { ...newBodies[bodyId], jointIds: [...newBodies[bodyId].jointIds, id] };
           reprojectOutlines(newOutlines, bodyId, oldBody, newBodies[bodyId], get().joints, newJoints);
+          reprojectTracers(newTracers, bodyId, oldBody, newBodies[bodyId], get().joints, newJoints);
         }
       }
     }
@@ -476,7 +478,7 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
     const { newLinks, angleConstraints: newAngle } = regenConstraints(newBodies, newJoints, get().sliders);
     updateJointConnections(newJoints, newLinks);
 
-    set({ joints: newJoints, links: newLinks, bodies: newBodies, outlines: newOutlines, angleConstraints: newAngle });
+    set({ joints: newJoints, links: newLinks, bodies: newBodies, outlines: newOutlines, tracers: newTracers, angleConstraints: newAngle });
     return id;
   },
 
@@ -487,8 +489,9 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
     const newJoints = { ...oldJoints };
     const newBodies = { ...oldBodies };
     const newOutlines = { ...get().outlines };
+    const newTracers = { ...get().tracers };
 
-    // Remove joint from all bodies, reprojecting outlines
+    // Remove joint from all bodies, reprojecting outlines and tracers
     for (const bodyId of Object.keys(newBodies)) {
       const body = newBodies[bodyId];
       if (body.jointIds.includes(id)) {
@@ -496,6 +499,7 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
         newBodies[bodyId] = { ...body, jointIds: body.jointIds.filter((jid) => jid !== id) };
         delete newJoints[id];
         reprojectOutlines(newOutlines, bodyId, oldBody, newBodies[bodyId], oldJoints, newJoints);
+        reprojectTracers(newTracers, bodyId, oldBody, newBodies[bodyId], oldJoints, newJoints);
       }
     }
 
@@ -524,7 +528,7 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
     const { newLinks, angleConstraints: newAngle } = regenConstraints(newBodies, newJoints, get().sliders);
     updateJointConnections(newJoints, newLinks);
 
-    set({ joints: newJoints, links: newLinks, bodies: newBodies, outlines: newOutlines, sliders: newSliders, angleConstraints: newAngle });
+    set({ joints: newJoints, links: newLinks, bodies: newBodies, outlines: newOutlines, tracers: newTracers, sliders: newSliders, angleConstraints: newAngle });
   },
 
   moveJoint(id, position) {
