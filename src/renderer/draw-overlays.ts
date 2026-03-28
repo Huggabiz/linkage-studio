@@ -506,23 +506,23 @@ export function drawArcSelector(
       // the text baseline faces the CCW side.
       const radialAngle = Math.atan2(nry, nrx);
       const textAngle = radialAngle - Math.PI;
-      const textAlign: CanvasTextAlign = 'left';
 
       ctx.save();
       ctx.globalAlpha = labelT * alpha;
       ctx.translate(labelX, labelY);
       ctx.rotate(textAngle);
 
-      // Clip to create a wipe effect: reveal text from left to right
+      // Clip to create a wipe effect: reveal text from right to left
+      // (since text is right-aligned, it grows from the anchor point leftward)
       const textWidth = 80;
       const clipWidth = textWidth * labelT;
       ctx.beginPath();
-      ctx.rect(0, -10, clipWidth, 20);
+      ctx.rect(-clipWidth, -10, clipWidth, 20);
       ctx.clip();
 
       ctx.font = '11px -apple-system, BlinkMacSystemFont, sans-serif';
       ctx.fillStyle = '#444';
-      ctx.textAlign = textAlign;
+      ctx.textAlign = 'right';
       ctx.textBaseline = 'middle';
       ctx.fillText(bodyNames[i], 0, 0);
 
