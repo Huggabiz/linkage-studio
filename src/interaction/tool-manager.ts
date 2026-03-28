@@ -15,17 +15,21 @@ export function getArcCirclePositions(
   camera: { pan: Vec2; zoom: number },
 ): { screenX: number; screenY: number; centerScreenX: number; centerScreenY: number; angle: number }[] {
   const RADIUS = 52; // screen px from joint center
-  const PER_CIRCLE_DEG = 38; // minimum angular spacing between circles
+  const PER_CIRCLE_DEG = 38; // angular spacing between circles
   const MAX_SPAN_DEG = 200;
-  const startAngleDeg = 345;
+  // Arc is centered at 345° (11 o'clock), expanding symmetrically clockwise
+  const centerAngleDeg = 345;
   const spanDeg = Math.min(MAX_SPAN_DEG, Math.max(PER_CIRCLE_DEG, (bodyCount - 1) * PER_CIRCLE_DEG));
+  // First circle at the counter-clockwise edge, last at the clockwise edge
+  const startAngleDeg = centerAngleDeg - spanDeg / 2;
   const centerScreenX = jointWorldPos.x * camera.zoom + camera.pan.x;
   const centerScreenY = jointWorldPos.y * camera.zoom + camera.pan.y;
 
   const positions: { screenX: number; screenY: number; centerScreenX: number; centerScreenY: number; angle: number }[] = [];
   for (let i = 0; i < bodyCount; i++) {
     const t = bodyCount > 1 ? i / (bodyCount - 1) : 0;
-    const angleDeg = startAngleDeg - spanDeg * t;
+    // Fan clockwise: increasing angle (0° = up, clockwise positive in screen space)
+    const angleDeg = startAngleDeg + spanDeg * t;
     const angleRad = (angleDeg - 90) * (Math.PI / 180);
     positions.push({
       screenX: centerScreenX + Math.cos(angleRad) * RADIUS,
@@ -140,7 +144,7 @@ let imageStartScale = 1;
 let longPressTimer: ReturnType<typeof setTimeout> | null = null;
 let longPressJointId: string | null = null;
 let longPressStartScreen: Vec2 | null = null;
-const LONG_PRESS_MS = 800;
+const LONG_PRESS_MS = 700;
 const LONG_PRESS_MOVE_THRESHOLD = 5; // px screen movement to cancel
 let imageStartPos: Vec2 = { x: 0, y: 0 };
 
