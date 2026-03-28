@@ -62,8 +62,8 @@ export function getArcCirclePositions(
   camera: { pan: Vec2; zoom: number },
 ): { screenX: number; screenY: number; centerScreenX: number; centerScreenY: number; angle: number }[] {
   const RADIUS = 52; // screen px from joint center
-  const PER_CIRCLE_DEG = 38; // angular spacing between circles
-  const MAX_SPAN_DEG = 300;
+  const PER_CIRCLE_DEG = 32; // angular spacing between circles
+  const MAX_SPAN_DEG = 250;
   // Arc is centered at 345° (11 o'clock), expanding symmetrically clockwise
   const centerAngleDeg = 315;
   const spanDeg = Math.min(MAX_SPAN_DEG, Math.max(PER_CIRCLE_DEG, (bodyCount - 1) * PER_CIRCLE_DEG));
@@ -96,8 +96,8 @@ export function getArcAddButtonPosition(
   camera: { pan: Vec2; zoom: number },
 ): { screenX: number; screenY: number; centerScreenX: number; centerScreenY: number } {
   const RADIUS = 52;
-  const PER_CIRCLE_DEG = 38;
-  const MAX_SPAN_DEG = 300;
+  const PER_CIRCLE_DEG = 32;
+  const MAX_SPAN_DEG = 250;
   const centerAngleDeg = 315;
   const spanDeg = Math.min(MAX_SPAN_DEG, Math.max(PER_CIRCLE_DEG, (bodyCount - 1) * PER_CIRCLE_DEG));
   // Place one step past the last body circle
