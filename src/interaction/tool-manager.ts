@@ -8,6 +8,30 @@ import { snapToGrid, distance, sub, dot, lengthSq } from '../core/math/vec2';
 import { computeBodyTransform, worldToLocal, localToWorld } from '../core/body-transform';
 import { HIT_RADIUS } from '../utils/constants';
 
+/** Start the long-press arc selector timer for a given joint. */
+function startArcTimer(jointId: string, screenX: number, screenY: number) {
+  longPressStartScreen = { x: screenX, y: screenY };
+  longPressJointId = jointId;
+  if (longPressTimer) clearTimeout(longPressTimer);
+  longPressTimer = setTimeout(() => {
+    if (longPressJointId) {
+      const j = useMechanismStore.getState().joints[longPressJointId];
+      if (j && !j.hidden) {
+        useEditorStore.getState().setArcSelector({
+          jointId: longPressJointId,
+          position: { ...j.position },
+          showTime: Date.now(),
+          collapseTime: null,
+          readyToToggle: new Set(Object.keys(useMechanismStore.getState().bodies)),
+        });
+        isDragging = false;
+        dragJointId = null;
+      }
+    }
+    longPressTimer = null;
+  }, LONG_PRESS_MS);
+}
+
 /** Compute the screen positions of arc selector body circles. */
 export function getArcCirclePositions(
   jointWorldPos: Vec2,
@@ -372,6 +396,7 @@ export function handleMouseDown(e: PointerEvent, canvas: HTMLCanvasElement) {
       const activeBodyIds = Array.from(editor.activeBodyIds);
       const jointId = mechanism.addJoint('revolute', pos, activeBodyIds);
       editor.setSliderPointA({ position: pos, jointId });
+      startArcTimer(jointId, e.clientX, e.clientY);
     } else {
       // Second click: place joint C, auto-create B at midpoint, create slider constraint
       const activeBodyIds = Array.from(editor.activeBodyIds);
@@ -436,6 +461,7 @@ export function handleMouseDown(e: PointerEvent, canvas: HTMLCanvasElement) {
       const activeBodyIds = Array.from(editor.activeBodyIds);
       const jointId = mechanism.addJoint('revolute', pos, activeBodyIds);
       editor.setColliderPointA({ position: pos, jointId });
+      startArcTimer(jointId, e.clientX, e.clientY);
     } else {
       // Second click: place endpoint C, create collider constraint + rigid link
       const activeBodyIds = Array.from(editor.activeBodyIds);
@@ -622,56 +648,14 @@ export function handleMouseDown(e: PointerEvent, canvas: HTMLCanvasElement) {
     isDragging = true;
     dragJointId = joint.id;
     mechanism.pushHistory();
-
-    // Start long-press timer for arc body selector
-    const screenPos2: Vec2 = { x: e.clientX, y: e.clientY };
-    longPressStartScreen = screenPos2;
-    longPressJointId = joint.id;
-    if (longPressTimer) clearTimeout(longPressTimer);
-    longPressTimer = setTimeout(() => {
-      if (longPressJointId) {
-        const j = useMechanismStore.getState().joints[longPressJointId];
-        if (j && !j.hidden) {
-          useEditorStore.getState().setArcSelector({
-            jointId: longPressJointId,
-            position: { ...j.position },
-            showTime: Date.now(),
-            collapseTime: null,
-            readyToToggle: new Set(Object.keys(useMechanismStore.getState().bodies)),
-          });
-          isDragging = false; // prevent joint dragging while arc is shown
-          dragJointId = null;
-        }
-      }
-      longPressTimer = null;
-    }, LONG_PRESS_MS);
+    startArcTimer(joint.id, e.clientX, e.clientY);
   } else if (editor.selectedIds.size > 0) {
     editor.clearSelection();
   } else {
     const pos = editor.gridEnabled ? snapToGrid(worldPos, editor.gridSize) : worldPos;
     const activeBodyIds = Array.from(editor.activeBodyIds);
     const newJointId = mechanism.addJoint('revolute', pos, activeBodyIds);
-
-    // Start long-press timer on newly placed joint (pen tap-and-hold)
-    const screenPos3: Vec2 = { x: e.clientX, y: e.clientY };
-    longPressStartScreen = screenPos3;
-    longPressJointId = newJointId;
-    if (longPressTimer) clearTimeout(longPressTimer);
-    longPressTimer = setTimeout(() => {
-      if (longPressJointId) {
-        const j = useMechanismStore.getState().joints[longPressJointId];
-        if (j && !j.hidden) {
-          useEditorStore.getState().setArcSelector({
-            jointId: longPressJointId,
-            position: { ...j.position },
-            showTime: Date.now(),
-            collapseTime: null,
-            readyToToggle: new Set(Object.keys(useMechanismStore.getState().bodies)),
-          });
-        }
-      }
-      longPressTimer = null;
-    }, LONG_PRESS_MS);
+    startArcTimer(newJointId, e.clientX, e.clientY);
   }
 }
 

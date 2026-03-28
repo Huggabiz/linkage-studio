@@ -127,7 +127,7 @@ export function render(
       let gravityForce: Vec2 | null = null;
       if (state.gravityEnabled) {
         const area = totalArea;
-        const massMult = Math.max(0.1, area / 1000);
+        const massMult = Math.max(0.1, area / 5000);
         gravityForce = { x: 0, y: state.gravityStrength * massMult * 0.005 };
       }
       comPositions.push({ pos: com, color: body.color, gravityForce });

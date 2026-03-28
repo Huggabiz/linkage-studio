@@ -178,6 +178,7 @@ export function solveWithForce(
   colliders?: Record<string, ColliderConstraint>,
   colliderSides?: Map<string, number>,
   bodiesRef?: Record<string, { jointIds: string[] }>,
+  comJointIds?: Set<string>,
 ): SolverResult {
   const freeJoints: Joint[] = [];
   const jointIndex = new Map<string, number>();
@@ -620,17 +621,21 @@ export function solveWithForce(
     const posBy = idxB !== undefined ? q[idxB + 1] : jB.position.y;
 
     if (gravity.enabled && (idxA !== undefined || idxB !== undefined)) {
-      // Skip gravity vectors for base-body-only links (both joints fixed)
-      const wA = jointGravityWeights?.get(jA.id) ?? 1;
-      const wB = jointGravityWeights?.get(jB.id) ?? 1;
-      const totalW = wA + wB;
-      const comX = totalW > 0 ? (posAx * wA + posBx * wB) / totalW : (posAx + posBx) / 2;
-      const comY = totalW > 0 ? (posAy * wA + posBy * wB) / totalW : (posAy + posBy) / 2;
-      forceVectors.push({
-        origin: { x: comX, y: comY },
-        force: { x: 0, y: link.mass * gravity.strength * 0.03 },
-        color: '#42A5F5',
-      });
+      // Skip per-link gravity vectors for joints in CoM-enabled bodies
+      // (those bodies show gravity via the CoM marker instead)
+      const inComBody = comJointIds && comJointIds.has(jA.id) && comJointIds.has(jB.id);
+      if (!inComBody) {
+        const wA = jointGravityWeights?.get(jA.id) ?? 1;
+        const wB = jointGravityWeights?.get(jB.id) ?? 1;
+        const totalW = wA + wB;
+        const comX = totalW > 0 ? (posAx * wA + posBx * wB) / totalW : (posAx + posBx) / 2;
+        const comY = totalW > 0 ? (posAy * wA + posBy * wB) / totalW : (posAy + posBy) / 2;
+        forceVectors.push({
+          origin: { x: comX, y: comY },
+          force: { x: 0, y: link.mass * gravity.strength * 0.03 },
+          color: '#42A5F5',
+        });
+      }
     }
 
     if (pullForce && pullForce.linkId === link.id) {
