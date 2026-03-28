@@ -227,6 +227,10 @@ export function SimulationPanel() {
 
       {physicsSection}
 
+      <div className="sim-controls" style={{ marginTop: 4 }}>
+        <button className="tool-btn" onClick={clearTraces}>Clear Traces</button>
+      </div>
+
       {viewSection}
     </div>
   );

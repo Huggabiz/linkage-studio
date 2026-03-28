@@ -82,6 +82,7 @@ interface MechanismStore {
   addTracer(bodyId: string, localPosition: Vec2): string;
   removeTracer(id: string): void;
   updateTracerBody(tracerId: string, bodyId: string): void;
+  moveTracer(id: string, localPosition: Vec2): void;
   toggleTracerEnabled(id: string): void;
 
   addTempJoint(position: Vec2, bodyId: string): string;
@@ -242,6 +243,14 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
       const tracer = s.tracers[tracerId];
       if (!tracer) return s;
       return { tracers: { ...s.tracers, [tracerId]: { ...tracer, bodyId } } };
+    });
+  },
+
+  moveTracer(id, localPosition) {
+    set((s) => {
+      const tracer = s.tracers[id];
+      if (!tracer) return s;
+      return { tracers: { ...s.tracers, [id]: { ...tracer, localPosition } } };
     });
   },
 
