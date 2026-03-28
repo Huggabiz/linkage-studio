@@ -144,7 +144,7 @@ let imageStartScale = 1;
 let longPressTimer: ReturnType<typeof setTimeout> | null = null;
 let longPressJointId: string | null = null;
 let longPressStartScreen: Vec2 | null = null;
-const LONG_PRESS_MS = 700;
+const LONG_PRESS_MS = 300;
 const LONG_PRESS_MOVE_THRESHOLD = 5; // px screen movement to cancel
 let imageStartPos: Vec2 = { x: 0, y: 0 };
 
@@ -650,7 +650,28 @@ export function handleMouseDown(e: PointerEvent, canvas: HTMLCanvasElement) {
   } else {
     const pos = editor.gridEnabled ? snapToGrid(worldPos, editor.gridSize) : worldPos;
     const activeBodyIds = Array.from(editor.activeBodyIds);
-    mechanism.addJoint('revolute', pos, activeBodyIds);
+    const newJointId = mechanism.addJoint('revolute', pos, activeBodyIds);
+
+    // Start long-press timer on newly placed joint (pen tap-and-hold)
+    const screenPos3: Vec2 = { x: e.clientX, y: e.clientY };
+    longPressStartScreen = screenPos3;
+    longPressJointId = newJointId;
+    if (longPressTimer) clearTimeout(longPressTimer);
+    longPressTimer = setTimeout(() => {
+      if (longPressJointId) {
+        const j = useMechanismStore.getState().joints[longPressJointId];
+        if (j && !j.hidden) {
+          useEditorStore.getState().setArcSelector({
+            jointId: longPressJointId,
+            position: { ...j.position },
+            showTime: Date.now(),
+            collapseTime: null,
+            readyToToggle: new Set(Object.keys(useMechanismStore.getState().bodies)),
+          });
+        }
+      }
+      longPressTimer = null;
+    }, LONG_PRESS_MS);
   }
 }
 
