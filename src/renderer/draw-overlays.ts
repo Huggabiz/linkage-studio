@@ -416,7 +416,9 @@ export function drawArcSelector(
   const now = Date.now();
   const CIRCLE_RADIUS = 12;
   const ANIM_DURATION = 180; // ms per circle
-  const STAGGER = 50; // ms between each circle
+  const MAX_TOTAL_STAGGER = 400; // ms max total stagger across all circles
+  const count = arcPositions.length;
+  const STAGGER = count > 1 ? Math.min(50, MAX_TOTAL_STAGGER / (count - 1)) : 50;
 
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);

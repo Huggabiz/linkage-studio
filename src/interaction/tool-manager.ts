@@ -16,7 +16,7 @@ export function getArcCirclePositions(
 ): { screenX: number; screenY: number; centerScreenX: number; centerScreenY: number; angle: number }[] {
   const RADIUS = 52; // screen px from joint center
   const PER_CIRCLE_DEG = 38; // angular spacing between circles
-  const MAX_SPAN_DEG = 200;
+  const MAX_SPAN_DEG = 300;
   // Arc is centered at 345° (11 o'clock), expanding symmetrically clockwise
   const centerAngleDeg = 345;
   const spanDeg = Math.min(MAX_SPAN_DEG, Math.max(PER_CIRCLE_DEG, (bodyCount - 1) * PER_CIRCLE_DEG));
@@ -145,7 +145,7 @@ let longPressTimer: ReturnType<typeof setTimeout> | null = null;
 let longPressJointId: string | null = null;
 let longPressStartScreen: Vec2 | null = null;
 const LONG_PRESS_MS = 300;
-const LONG_PRESS_MOVE_THRESHOLD = 5; // px screen movement to cancel
+const LONG_PRESS_MOVE_THRESHOLD_BASE = 8; // px screen movement to cancel (minimum)
 let imageStartPos: Vec2 = { x: 0, y: 0 };
 
 export function handleMouseDown(e: PointerEvent, canvas: HTMLCanvasElement) {
@@ -702,11 +702,13 @@ export function handleMouseMove(e: PointerEvent, canvas: HTMLCanvasElement) {
   const screenPos: Vec2 = { x: e.clientX - rect.left, y: e.clientY - rect.top };
   const worldPos = screenToWorld(screenPos, editor.camera);
 
-  // Cancel long-press if cursor moved too far
+  // Cancel long-press if cursor moved too far (threshold scales with grid coarseness)
   if (longPressTimer && longPressStartScreen) {
+    const gridScreenPx = editor.gridEnabled ? editor.gridSize * editor.camera.zoom : 0;
+    const threshold = Math.max(LONG_PRESS_MOVE_THRESHOLD_BASE, gridScreenPx * 0.4);
     const dx = e.clientX - longPressStartScreen.x;
     const dy = e.clientY - longPressStartScreen.y;
-    if (Math.sqrt(dx * dx + dy * dy) > LONG_PRESS_MOVE_THRESHOLD) {
+    if (Math.sqrt(dx * dx + dy * dy) > threshold) {
       clearTimeout(longPressTimer);
       longPressTimer = null;
       longPressJointId = null;
@@ -872,7 +874,8 @@ export function handleMouseUp(_e: PointerEvent | MouseEvent) {
     editor.setArcSelector({ ...editor.arcSelector, collapseTime: Date.now() });
     // Clear after animation completes (stagger + duration)
     const bodyCount = Object.keys(useMechanismStore.getState().bodies).length;
-    const totalDuration = bodyCount * 50 + 200;
+    const staggerPerCircle = bodyCount > 1 ? Math.min(50, 400 / (bodyCount - 1)) : 50;
+    const totalDuration = (bodyCount - 1) * staggerPerCircle + 250;
     setTimeout(() => {
       useEditorStore.getState().setArcSelector(null);
     }, totalDuration);
