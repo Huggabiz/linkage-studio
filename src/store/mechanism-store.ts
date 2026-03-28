@@ -91,7 +91,12 @@ interface MechanismStore {
 export const useMechanismStore = create<MechanismStore>((set, get) => ({
   joints: {},
   links: {},
-  bodies: { [BASE_BODY_ID]: createBaseBody() },
+  bodies: {
+    [BASE_BODY_ID]: createBaseBody(),
+    body1: { id: 'body1', name: 'Body 1', color: BODY_COLORS[0], jointIds: [], useOutlineCOM: false, showLinks: true },
+    body2: { id: 'body2', name: 'Body 2', color: BODY_COLORS[1], jointIds: [], useOutlineCOM: false, showLinks: true },
+    body3: { id: 'body3', name: 'Body 3', color: BODY_COLORS[2], jointIds: [], useOutlineCOM: false, showLinks: true },
+  },
   baseBodyId: BASE_BODY_ID,
   outlines: {},
   images: {},
@@ -296,7 +301,12 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
     set({
       joints: {},
       links: {},
-      bodies: { [BASE_BODY_ID]: createBaseBody() },
+      bodies: {
+        [BASE_BODY_ID]: createBaseBody(),
+        body1: { id: 'body1', name: 'Body 1', color: BODY_COLORS[0], jointIds: [], useOutlineCOM: false, showLinks: true },
+        body2: { id: 'body2', name: 'Body 2', color: BODY_COLORS[1], jointIds: [], useOutlineCOM: false, showLinks: true },
+        body3: { id: 'body3', name: 'Body 3', color: BODY_COLORS[2], jointIds: [], useOutlineCOM: false, showLinks: true },
+      },
       baseBodyId: BASE_BODY_ID,
       outlines: {},
       images: {},
