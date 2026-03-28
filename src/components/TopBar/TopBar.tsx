@@ -1,3 +1,4 @@
+import { useState, useRef, useEffect } from 'react';
 import { useEditorStore } from '../../store/editor-store';
 import { useMechanismStore } from '../../store/mechanism-store';
 import { useSimulationStore } from '../../store/simulation-store';
@@ -6,6 +7,53 @@ import type { GridLevel } from '../../types';
 import './TopBar.css';
 
 declare const __APP_VERSION__: string;
+
+function ProjectNameInput() {
+  const projectName = useEditorStore((s) => s.projectName);
+  const setProjectName = useEditorStore((s) => s.setProjectName);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(projectName);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { setDraft(projectName); }, [projectName]);
+  useEffect(() => { if (editing) inputRef.current?.select(); }, [editing]);
+
+  if (!editing) {
+    return (
+      <span
+        className="project-name"
+        onClick={() => setEditing(true)}
+        title="Click to rename project"
+      >
+        {projectName}
+      </span>
+    );
+  }
+
+  return (
+    <input
+      ref={inputRef}
+      className="project-name-input"
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => {
+        const trimmed = draft.trim();
+        if (trimmed) setProjectName(trimmed);
+        setEditing(false);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          const trimmed = draft.trim();
+          if (trimmed) setProjectName(trimmed);
+          setEditing(false);
+        } else if (e.key === 'Escape') {
+          setDraft(projectName);
+          setEditing(false);
+        }
+      }}
+    />
+  );
+}
 
 export function TopBar() {
   const undo = useMechanismStore((s) => s.undo);
@@ -28,6 +76,18 @@ export function TopBar() {
     const editor = useEditorStore.getState();
     const sim = useSimulationStore.getState();
 
+    // If project is still "Untitled", prompt for a name
+    let name = editor.projectName;
+    if (name === 'Untitled') {
+      const newName = prompt('Project name:', name);
+      if (!newName) return; // cancelled
+      const trimmed = newName.trim();
+      if (trimmed) {
+        name = trimmed;
+        editor.setProjectName(name);
+      }
+    }
+
     const viewPreferences = {
       showLinks: editor.showLinks,
       showVectors: editor.showVectors,
@@ -45,9 +105,8 @@ export function TopBar() {
       dragDamping: sim.dragDamping,
     };
 
-    const json = serializeMechanism(joints, links, bodies, baseBodyId, outlines, images, sliders, colliders, viewPreferences, simulationSettings);
-    const timestamp = new Date().toISOString().slice(0, 16).replace(/[:-]/g, '');
-    await saveFileAs(json, `linkage_${timestamp}.slinker`);
+    const json = serializeMechanism(joints, links, bodies, baseBodyId, outlines, images, sliders, colliders, name, viewPreferences, simulationSettings);
+    await saveFileAs(json, `${name}.slinker`);
   };
 
   const handleOpen = async () => {
@@ -57,6 +116,11 @@ export function TopBar() {
     if (!state) { alert('Invalid file format'); return; }
     loadState(state);
     clearSelection();
+
+    // Restore project name from file if present
+    if (state.projectName) {
+      useEditorStore.getState().setProjectName(state.projectName);
+    }
 
     // Restore view preferences
     if (state.viewPreferences) {
@@ -68,7 +132,6 @@ export function TopBar() {
       if (vp.showForceUnits !== undefined) { if (vp.showForceUnits !== editor.showForceUnits) editor.toggleShowForceUnits(); }
       if (vp.gridLevel) editor.setGridLevel(vp.gridLevel as GridLevel);
       if (vp.camera) {
-        // Set camera directly via store
         useEditorStore.setState({ camera: { pan: vp.camera.pan, zoom: vp.camera.zoom } });
       }
     }
@@ -134,6 +197,10 @@ export function TopBar() {
           Clear All
         </button>
       </div>
+
+      <div className="top-bar-separator" />
+
+      <ProjectNameInput />
 
       <div className="top-bar-spacer" />
 

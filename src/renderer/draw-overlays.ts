@@ -400,6 +400,55 @@ export function drawDragInteraction(
   ctx.fill();
 }
 
+/**
+ * Draw the long-press arc body selector around a joint.
+ * Drawn in screen-space (call after resetCamera).
+ */
+export function drawArcSelector(
+  ctx: CanvasRenderingContext2D,
+  arcPositions: { screenX: number; screenY: number }[],
+  bodyColors: string[],
+  bodySelected: boolean[],
+  showTime: number,
+) {
+  const now = Date.now();
+  const elapsed = now - showTime;
+  const CIRCLE_RADIUS = 11;
+
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+  for (let i = 0; i < arcPositions.length; i++) {
+    // Staggered animation: each circle delays 50ms
+    const circleElapsed = elapsed - i * 50;
+    if (circleElapsed < 0) continue;
+    const animT = Math.min(1, circleElapsed / 150); // 150ms ease-out
+    const scale = 0.3 + 0.7 * (1 - Math.pow(1 - animT, 3)); // cubic ease-out
+
+    const { screenX, screenY } = arcPositions[i];
+    const r = CIRCLE_RADIUS * scale;
+
+    // Filled circle with body color
+    ctx.beginPath();
+    ctx.arc(screenX, screenY, r, 0, Math.PI * 2);
+    ctx.fillStyle = bodyColors[i];
+    ctx.fill();
+
+    // Selection ring (blue) if joint is in this body
+    if (bodySelected[i]) {
+      ctx.strokeStyle = '#2196F3';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+    } else {
+      ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+  }
+
+  ctx.restore();
+}
+
 export function drawModeBadge(
   ctx: CanvasRenderingContext2D,
   canvasWidth: number,

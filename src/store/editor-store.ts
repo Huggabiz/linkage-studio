@@ -34,6 +34,7 @@ interface EditorStore {
   showVectors: boolean;
   showRulers: boolean;
   showForceUnits: boolean;
+  projectName: string;
   createTool: CreateTool;
   jointMode: JointMode;
   autoChainLastBodyId: string | null;
@@ -66,6 +67,7 @@ interface EditorStore {
   toggleShowVectors(): void;
   toggleShowRulers(): void;
   toggleShowForceUnits(): void;
+  setProjectName(name: string): void;
   setCreateTool(tool: CreateTool): void;
   setJointMode(mode: JointMode): void;
   setAutoChainLastBodyId(id: string | null): void;
@@ -79,8 +81,20 @@ interface EditorStore {
   setColliderPointA(point: { position: Vec2; jointId: string } | null): void;
   editingOutlineId: string | null;
   editingVertexIndex: number | null;
+
+  /** Long-press arc body selector state */
+  arcSelector: {
+    jointId: string;
+    /** World position of the joint */
+    position: Vec2;
+    /** Timestamp when arc became visible (for animation) */
+    showTime: number;
+    /** Set of body IDs that have been toggled this session (prevents re-toggling on same pass) */
+    readyToToggle: Set<string>;
+  } | null;
   setEditingOutline(outlineId: string | null): void;
   setEditingVertexIndex(index: number | null): void;
+  setArcSelector(arc: EditorStore['arcSelector']): void;
   updateFrozenOutline(outlineId: string, worldPoints: Vec2[]): void;
 }
 
@@ -102,6 +116,7 @@ export const useEditorStore = create<EditorStore>((set) => ({
   showVectors: true,
   showRulers: true,
   showForceUnits: true,
+  projectName: 'Untitled',
   createTool: 'joints' as CreateTool,
   jointMode: 'manual' as JointMode,
   autoChainLastBodyId: null as string | null,
@@ -115,6 +130,7 @@ export const useEditorStore = create<EditorStore>((set) => ({
   colliderPointA: null,
   editingOutlineId: null,
   editingVertexIndex: null,
+  arcSelector: null,
 
   setMode(mode) {
     set({ mode, simDrag: null, linkStartJointId: null, selectedIds: new Set(), outlinePoints: [], createTool: 'joints' as CreateTool, jointMode: 'manual' as JointMode, autoChainLastBodyId: null, lockOutlines: true, frozenOutlineWorldPoints: new Map(), sliderPointA: null, colliderPointA: null, editingOutlineId: null, editingVertexIndex: null });
@@ -227,6 +243,10 @@ export const useEditorStore = create<EditorStore>((set) => ({
     set((s) => ({ showForceUnits: !s.showForceUnits }));
   },
 
+  setProjectName(name) {
+    set({ projectName: name });
+  },
+
   setCreateTool(tool) {
     set({ createTool: tool, outlinePoints: [], jointMode: 'manual' as JointMode, autoChainLastBodyId: null, sliderPointA: null, colliderPointA: null, editingOutlineId: null, editingVertexIndex: null });
   },
@@ -285,6 +305,10 @@ export const useEditorStore = create<EditorStore>((set) => ({
 
   setEditingVertexIndex(index) {
     set({ editingVertexIndex: index });
+  },
+
+  setArcSelector(arc) {
+    set({ arcSelector: arc });
   },
 
   updateFrozenOutline(outlineId, worldPoints) {
