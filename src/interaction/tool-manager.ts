@@ -772,7 +772,11 @@ export function handleMouseDown(e: PointerEvent, canvas: HTMLCanvasElement) {
         if (body) {
           const transform = computeBodyTransform(body, mechanism.joints);
           const localPoints = points.map((p) => worldToLocal(p, transform));
-          mechanism.addOutline(activeBodyId, localPoints);
+          const outlineId = mechanism.addOutline(activeBodyId, localPoints);
+          // Freeze the new outline's world points if lock is on
+          if (editor.lockOutlines && outlineId) {
+            editor.updateFrozenOutline(outlineId, points);
+          }
         }
         editor.clearOutlinePoints();
         return;
