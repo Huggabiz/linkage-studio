@@ -707,7 +707,6 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
   addOutline(bodyId, localPoints) {
     const id = createId();
     get().pushHistory();
-    // Auto-name: find next available "Shape N"
     const existingNames = new Set(Object.values(get().outlines).map((o) => o.name));
     let num = 1;
     while (existingNames.has(`Shape ${num}`)) num++;

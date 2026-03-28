@@ -86,7 +86,25 @@ export function MechanismCanvas() {
         gravityEnabled: sim.gravityEnabled,
         gravityStrength: sim.gravityStrength,
         baseBodyId: mechanism.baseBodyId,
-        frozenOutlinePoints: editor.lockOutlines ? editor.frozenOutlineWorldPoints : undefined,
+        frozenOutlinePoints: editor.lockOutlines ? (() => {
+          // Ensure all outlines are in the frozen map — fill missing ones
+          const frozen = editor.frozenOutlineWorldPoints;
+          let needsUpdate = false;
+          const updates: [string, import('../../types').Vec2[]][] = [];
+          for (const outline of Object.values(mechanism.outlines)) {
+            if (outline.points.length < 2 || frozen.has(outline.id)) continue;
+            const body = mechanism.bodies[outline.bodyId];
+            if (!body) continue;
+            const transform = computeBodyTransform(body, mechanism.joints);
+            updates.push([outline.id, outline.points.map((p) => localToWorld(p, transform))]);
+            needsUpdate = true;
+          }
+          if (needsUpdate) {
+            for (const [id, pts] of updates) editor.updateFrozenOutline(id, pts);
+            return new Map([...frozen, ...updates]);
+          }
+          return frozen;
+        })() : undefined,
         sliderPointA: editor.sliderPointA?.position ?? null,
         colliderPointA: editor.colliderPointA?.position ?? null,
         editingOutlineId: editor.editingOutlineId,
