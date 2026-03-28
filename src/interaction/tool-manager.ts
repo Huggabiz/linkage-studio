@@ -65,7 +65,7 @@ export function getArcCirclePositions(
   const PER_CIRCLE_DEG = 38; // angular spacing between circles
   const MAX_SPAN_DEG = 300;
   // Arc is centered at 345° (11 o'clock), expanding symmetrically clockwise
-  const centerAngleDeg = 345;
+  const centerAngleDeg = 315;
   const spanDeg = Math.min(MAX_SPAN_DEG, Math.max(PER_CIRCLE_DEG, (bodyCount - 1) * PER_CIRCLE_DEG));
   // First circle at the counter-clockwise edge, last at the clockwise edge
   const startAngleDeg = centerAngleDeg - spanDeg / 2;
@@ -98,7 +98,7 @@ export function getArcAddButtonPosition(
   const RADIUS = 52;
   const PER_CIRCLE_DEG = 38;
   const MAX_SPAN_DEG = 300;
-  const centerAngleDeg = 345;
+  const centerAngleDeg = 315;
   const spanDeg = Math.min(MAX_SPAN_DEG, Math.max(PER_CIRCLE_DEG, (bodyCount - 1) * PER_CIRCLE_DEG));
   // Place one step past the last body circle
   const addAngleDeg = centerAngleDeg + spanDeg / 2 + PER_CIRCLE_DEG;
@@ -957,10 +957,12 @@ export function handleMouseUp(_e: PointerEvent | MouseEvent, canvas?: HTMLCanvas
       if (Math.sqrt(dx * dx + dy * dy) < 14) {
         // Create a new body and assign the joint/collider to it
         const newBodyId = mech.addBody('Body');
+        // Re-read store after addBody to ensure fresh state
+        const freshMech = useMechanismStore.getState();
         if (arc.jointId) {
-          mech.addJointToBody(arc.jointId, newBodyId);
+          freshMech.addJointToBody(arc.jointId, newBodyId);
         } else if (arc.colliderId) {
-          mech.addBodyToCollider(arc.colliderId, newBodyId);
+          freshMech.addBodyToCollider(arc.colliderId, newBodyId);
         }
       }
     }
