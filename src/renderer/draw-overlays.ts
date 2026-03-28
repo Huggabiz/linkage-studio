@@ -532,8 +532,8 @@ export function drawArcSelector(
     }
   }
 
-  // Draw "Add Body" button at the end of the arc
-  if (addButtonPos && collapseTime === null) {
+  // Draw "Add Body" button at the end of the arc (hidden once a body has been created)
+  if (addButtonPos && collapseTime === null && !addButtonActive) {
     const addIdx = arcPositions.length; // stagger index
     const expandElapsed = now - showTime - addIdx * STAGGER;
     if (expandElapsed > 0) {
