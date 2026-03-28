@@ -172,6 +172,15 @@ function App() {
               if (pos) sim.recordTrace(jointId, pos);
             }
           }
+          // Record tracer paths
+          for (const tracer of Object.values(mech.tracers)) {
+            if (!tracer.enabled) continue;
+            const body = mech.bodies[tracer.bodyId];
+            if (!body) continue;
+            const transform = computeBodyTransform(body, mech.joints);
+            const worldPt = localToWorld(tracer.localPosition, transform);
+            sim.recordTracerTrace(tracer.id, worldPt);
+          }
         }
         return;
       }

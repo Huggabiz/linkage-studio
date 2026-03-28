@@ -19,7 +19,7 @@ function startArcTimer(jointId: string, screenX: number, screenY: number) {
       if (j && !j.hidden) {
         useEditorStore.getState().setArcSelector({
           jointId: longPressJointId,
-          colliderId: null,
+          colliderId: null, tracerId: null,
           position: { ...j.position },
           showTime: Date.now(),
           collapseTime: null,
@@ -50,6 +50,34 @@ function startColliderArcTimer(colliderId: string, worldPos: Vec2, screenX: numb
         collapseTime: null,
         readyToToggle: new Set([...Object.keys(mech.bodies), '__add_body__']), createdBodyId: null, lastToggleTime: 0, lastToggle: null,
       });
+    }
+    longPressTimer = null;
+  }, LONG_PRESS_MS);
+}
+
+/** Start the long-press arc selector timer for a tracer (single-select body mode). */
+function startTracerArcTimer(tracerId: string, screenX: number, screenY: number) {
+  longPressStartScreen = { x: screenX, y: screenY };
+  longPressJointId = tracerId;
+  if (longPressTimer) clearTimeout(longPressTimer);
+  longPressTimer = setTimeout(() => {
+    const mech = useMechanismStore.getState();
+    const tracer = mech.tracers[tracerId];
+    if (tracer) {
+      const body = mech.bodies[tracer.bodyId];
+      if (body) {
+        const transform = computeBodyTransform(body, mech.joints);
+        const worldPt = localToWorld(tracer.localPosition, transform);
+        useEditorStore.getState().setArcSelector({
+          jointId: null,
+          colliderId: null, tracerId: null,
+          tracerId,
+          position: { ...worldPt },
+          showTime: Date.now(),
+          collapseTime: null,
+          readyToToggle: new Set([...Object.keys(mech.bodies), '__add_body__']), createdBodyId: null, lastToggleTime: 0, lastToggle: null,
+        });
+      }
     }
     longPressTimer = null;
   }, LONG_PRESS_MS);
@@ -145,7 +173,14 @@ function handleArcHover(worldPos: Vec2, editor: ReturnType<typeof useEditorStore
       // Cursor is inside this circle — toggle if ready
       if (arc.readyToToggle.has(body.id)) {
         let wasAdded = false;
-        if (arc.colliderId) {
+        if (arc.tracerId) {
+          // Tracer mode: single-select — set tracer to this body
+          const tracer = mechanism.tracers[arc.tracerId];
+          if (tracer && tracer.bodyId !== body.id) {
+            mechanism.updateTracerBody(arc.tracerId, body.id);
+            wasAdded = true;
+          }
+        } else if (arc.colliderId) {
           const collider = mechanism.colliders[arc.colliderId];
           if (collider) {
             if (collider.bodyIds.includes(body.id)) {
@@ -563,6 +598,39 @@ export function handleMouseDown(e: PointerEvent, canvas: HTMLCanvasElement) {
     return;
   }
 
+  // --- TRACER TOOL ---
+  if (editor.createTool === 'tracer') {
+    // Check for existing tracer hit (select it)
+    for (const tracer of Object.values(mechanism.tracers)) {
+      const body = mechanism.bodies[tracer.bodyId];
+      if (!body) continue;
+      const transform = computeBodyTransform(body, mechanism.joints);
+      const worldPt = localToWorld(tracer.localPosition, transform);
+      if (distance(worldPos, worldPt) < HIT_RADIUS / editor.camera.zoom) {
+        editor.select(tracer.id);
+        startTracerArcTimer(tracer.id, e.clientX, e.clientY);
+        return;
+      }
+    }
+
+    if (editor.selectedIds.size > 0) {
+      editor.clearSelection();
+      return;
+    }
+
+    // Place a tracer on the active body (radio-select, single body)
+    const activeBodyId = [...editor.activeBodyIds][0];
+    if (!activeBodyId || !mechanism.bodies[activeBodyId]) return;
+
+    const pos = editor.gridEnabled ? snapToGrid(worldPos, editor.gridSize) : worldPos;
+    const body = mechanism.bodies[activeBodyId];
+    const transform = computeBodyTransform(body, mechanism.joints);
+    const localPt = worldToLocal(pos, transform);
+    const tracerId = mechanism.addTracer(activeBodyId, localPt);
+    editor.select(tracerId);
+    return;
+  }
+
   // --- OUTLINE TOOL ---
   if (editor.createTool === 'outline') {
     // --- OUTLINE EDIT MODE ---
@@ -755,7 +823,7 @@ export function handleMouseDown(e: PointerEvent, canvas: HTMLCanvasElement) {
         if (j && !j.hidden) {
           useEditorStore.getState().setArcSelector({
             jointId: newId,
-            colliderId: null,
+            colliderId: null, tracerId: null,
             position: { ...j.position },
             showTime: Date.now(),
             collapseTime: null,

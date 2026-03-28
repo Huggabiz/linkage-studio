@@ -60,6 +60,8 @@ export function MechanismCanvas() {
         images: mechanism.images,
         sliders: mechanism.sliders,
         colliders: mechanism.colliders,
+        tracers: mechanism.tracers,
+        tracerPaths: sim.tracerPaths || new Map(),
         selectedIds: editor.selectedIds,
         hoveredId: editor.hoveredId,
         camera: editor.camera,
@@ -89,7 +91,7 @@ export function MechanismCanvas() {
         colliderPointA: editor.colliderPointA?.position ?? null,
         editingOutlineId: editor.editingOutlineId,
         editingVertexIndex: editor.editingVertexIndex,
-        arcSelector: editor.arcSelector ? { jointId: editor.arcSelector.jointId, colliderId: editor.arcSelector.colliderId, position: editor.arcSelector.position, showTime: editor.arcSelector.showTime, collapseTime: editor.arcSelector.collapseTime, createdBodyId: editor.arcSelector.createdBodyId } : null,
+        arcSelector: editor.arcSelector ? { jointId: editor.arcSelector.jointId, colliderId: editor.arcSelector.colliderId, tracerId: editor.arcSelector.tracerId, position: editor.arcSelector.position, showTime: editor.arcSelector.showTime, collapseTime: editor.arcSelector.collapseTime, createdBodyId: editor.arcSelector.createdBodyId } : null,
       });
     } catch (e) {
       console.error('Render error:', e);

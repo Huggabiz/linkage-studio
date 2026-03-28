@@ -88,6 +88,8 @@ interface EditorStore {
     jointId: string | null;
     /** Collider ID when assigning collider barrier bodies */
     colliderId: string | null;
+    /** Tracer ID when reassigning tracer body (single-select mode) */
+    tracerId: string | null;
     position: Vec2;
     showTime: number;
     collapseTime: number | null;

@@ -87,6 +87,17 @@ export interface ColliderConstraint {
   bodyIds: string[];
 }
 
+/**
+ * Tracer: a point fixed to a body that plots its world-space path
+ * during simulation. Position stored in body-local coordinates.
+ */
+export interface Tracer {
+  readonly id: string;
+  bodyId: string;
+  localPosition: Vec2;
+  enabled: boolean;
+}
+
 export interface MechanismState {
   joints: Record<string, Joint>;
   links: Record<string, Link>;
@@ -96,4 +107,5 @@ export interface MechanismState {
   images: Record<string, CanvasImage>;
   sliders: Record<string, SliderConstraint>;
   colliders: Record<string, ColliderConstraint>;
+  tracers: Record<string, Tracer>;
 }

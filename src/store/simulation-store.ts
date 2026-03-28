@@ -12,6 +12,7 @@ interface SimulationStore {
   dof: number;
   solverResult: SolverResult | null;
   pathTraces: Map<string, Vec2[]>;
+  tracerPaths: Map<string, Vec2[]>;
   tracingEnabled: boolean;
   trackedJointIds: Set<string>;
   gravityEnabled: boolean;
@@ -31,6 +32,7 @@ interface SimulationStore {
   setSolverResult(result: SolverResult | null): void;
   advanceTime(dt: number): void;
   recordTrace(jointId: string, pos: Vec2): void;
+  recordTracerTrace(tracerId: string, pos: Vec2): void;
   clearTraces(): void;
   toggleTracing(jointId: string): void;
   toggleGravity(): void;
@@ -51,6 +53,7 @@ export const useSimulationStore = create<SimulationStore>((set) => ({
   dof: 0,
   solverResult: null,
   pathTraces: new Map(),
+  tracerPaths: new Map(),
   tracingEnabled: false,
   trackedJointIds: new Set(),
   gravityEnabled: false,
@@ -61,7 +64,7 @@ export const useSimulationStore = create<SimulationStore>((set) => ({
 
   play() { set({ isPlaying: true }); },
   pause() { set({ isPlaying: false }); },
-  reset() { set({ isPlaying: false, time: 0, driverAngle: 0, pathTraces: new Map() }); },
+  reset() { set({ isPlaying: false, time: 0, driverAngle: 0, pathTraces: new Map(), tracerPaths: new Map() }); },
   setSpeed(speed) { set({ speed }); },
 
   setDriver(jointId, linkId, type) {
@@ -89,7 +92,16 @@ export const useSimulationStore = create<SimulationStore>((set) => ({
     });
   },
 
-  clearTraces() { set({ pathTraces: new Map() }); },
+  recordTracerTrace(tracerId, pos) {
+    set((s) => {
+      const traces = new Map(s.tracerPaths);
+      const arr = traces.get(tracerId) || [];
+      traces.set(tracerId, [...arr, pos]);
+      return { tracerPaths: traces };
+    });
+  },
+
+  clearTraces() { set({ pathTraces: new Map(), tracerPaths: new Map() }); },
 
   toggleTracing(jointId) {
     set((s) => {
