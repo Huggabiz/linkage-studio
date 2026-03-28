@@ -6,7 +6,7 @@ import { drawImages } from './draw-images';
 import { drawGrid, drawRulers, drawPathTraces, drawForceVectors, drawDragInteraction, drawModeBadge, drawHUD, clearCanvas, drawCOMMarkers, drawArcSelector } from './draw-overlays';
 import { lerp } from '../core/math/vec2';
 import { computeBodyTransform, localToWorld, polygonCentroid, polygonArea } from '../core/body-transform';
-import { getArcCirclePositions } from '../interaction/tool-manager';
+import { getArcCirclePositions, getArcAddButtonPosition } from '../interaction/tool-manager';
 
 export interface RenderState {
   joints: Record<string, Joint>;
@@ -181,6 +181,7 @@ export function render(
       const joint = state.arcSelector.jointId ? state.joints[state.arcSelector.jointId] : null;
       selected = bodies.map((b) => joint ? b.jointIds.includes(state.arcSelector!.jointId!) : false);
     }
-    drawArcSelector(ctx, positions, colors, selected, names, state.arcSelector.showTime, state.arcSelector.collapseTime);
+    const addBtnPos = getArcAddButtonPosition(state.arcSelector.position, bodies.length, state.camera);
+    drawArcSelector(ctx, positions, colors, selected, names, state.arcSelector.showTime, state.arcSelector.collapseTime, addBtnPos);
   }
 }

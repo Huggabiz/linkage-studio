@@ -280,12 +280,13 @@ export function drawMechanism(
     ? new Set(bodies[baseBodyId].jointIds)
     : new Set<string>();
 
-  // Build link-to-body color map: find the body that owns both endpoints
+  // Build link-to-body color map: find the non-base body that owns both endpoints
   const linkColors = new Map<string, string>();
   for (const link of Object.values(links)) {
     const [idA, idB] = link.jointIds;
     let bestColor = '#666666'; // fallback
     for (const body of Object.values(bodies)) {
+      if (body.id === baseBodyId) continue; // never use base body color for links
       if (body.jointIds.includes(idA) && body.jointIds.includes(idB)) {
         bestColor = body.color;
         break;
@@ -307,8 +308,8 @@ export function drawMechanism(
           break;
         }
       }
-      // Never show links where both endpoints are in the base body
-      if (baseJointIds.has(idA) && baseJointIds.has(idB)) continue;
+      // Skip if no non-base body owns this link (never show base-only red links)
+      if (!owningBody) continue;
       // Skip if the owning body has links hidden
       if (owningBody && !owningBody.showLinks) continue;
       // Skip links involving hidden bracing joints

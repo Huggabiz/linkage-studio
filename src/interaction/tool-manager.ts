@@ -89,6 +89,30 @@ export function getArcCirclePositions(
   return positions;
 }
 
+/** Compute the screen position of the "Add Body" button at the end of the arc. */
+export function getArcAddButtonPosition(
+  jointWorldPos: Vec2,
+  bodyCount: number,
+  camera: { pan: Vec2; zoom: number },
+): { screenX: number; screenY: number; centerScreenX: number; centerScreenY: number } {
+  const RADIUS = 52;
+  const PER_CIRCLE_DEG = 38;
+  const MAX_SPAN_DEG = 300;
+  const centerAngleDeg = 345;
+  const spanDeg = Math.min(MAX_SPAN_DEG, Math.max(PER_CIRCLE_DEG, (bodyCount - 1) * PER_CIRCLE_DEG));
+  // Place one step past the last body circle
+  const addAngleDeg = centerAngleDeg + spanDeg / 2 + PER_CIRCLE_DEG;
+  const angleRad = (addAngleDeg - 90) * (Math.PI / 180);
+  const centerScreenX = jointWorldPos.x * camera.zoom + camera.pan.x;
+  const centerScreenY = jointWorldPos.y * camera.zoom + camera.pan.y;
+  return {
+    screenX: centerScreenX + Math.cos(angleRad) * RADIUS,
+    screenY: centerScreenY + Math.sin(angleRad) * RADIUS,
+    centerScreenX,
+    centerScreenY,
+  };
+}
+
 /** Handle cursor movement over arc body circles — toggle body membership on enter. */
 function handleArcHover(worldPos: Vec2, editor: ReturnType<typeof useEditorStore.getState>) {
   const arc = editor.arcSelector;
@@ -908,7 +932,7 @@ export function handleMouseMove(e: PointerEvent, canvas: HTMLCanvasElement) {
   lastMouse = screenPos;
 }
 
-export function handleMouseUp(_e: PointerEvent | MouseEvent) {
+export function handleMouseUp(_e: PointerEvent | MouseEvent, canvas?: HTMLCanvasElement) {
   const editor = useEditorStore.getState();
 
   // Cancel long-press timer
@@ -916,11 +940,33 @@ export function handleMouseUp(_e: PointerEvent | MouseEvent) {
   longPressJointId = null;
   longPressStartScreen = null;
 
-  // Start arc collapse animation on mouse release (don't clear immediately)
+  // Arc selector: check if releasing on "Add Body" button, then collapse
   if (editor.arcSelector && !editor.arcSelector.collapseTime) {
-    editor.setArcSelector({ ...editor.arcSelector, collapseTime: Date.now() });
-    // Clear after animation completes (stagger + duration)
-    const bodyCount = Object.keys(useMechanismStore.getState().bodies).length;
+    const arc = editor.arcSelector;
+    const mech = useMechanismStore.getState();
+    const bodyCount = Object.keys(mech.bodies).length;
+
+    // Check if cursor is over the "Add Body" button
+    if (canvas) {
+      const rect = canvas.getBoundingClientRect();
+      const cursorScreenX = _e.clientX - rect.left;
+      const cursorScreenY = _e.clientY - rect.top;
+      const addPos = getArcAddButtonPosition(arc.position, bodyCount, editor.camera);
+      const dx = cursorScreenX - addPos.screenX;
+      const dy = cursorScreenY - addPos.screenY;
+      if (Math.sqrt(dx * dx + dy * dy) < 14) {
+        // Create a new body and assign the joint/collider to it
+        const newBodyId = mech.addBody('Body');
+        if (arc.jointId) {
+          mech.addJointToBody(arc.jointId, newBodyId);
+        } else if (arc.colliderId) {
+          mech.addBodyToCollider(arc.colliderId, newBodyId);
+        }
+      }
+    }
+
+    // Start collapse animation
+    editor.setArcSelector({ ...arc, collapseTime: Date.now() });
     const staggerPerCircle = bodyCount > 1 ? Math.min(50, 400 / (bodyCount - 1)) : 50;
     const totalDuration = (bodyCount - 1) * staggerPerCircle + 250;
     setTimeout(() => {
