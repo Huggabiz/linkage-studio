@@ -69,6 +69,9 @@ export function BodyPanel() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [collapsedBodies, setCollapsedBodies] = useState<Set<string>>(new Set());
 
+  const tracers = useMechanismStore((s) => s.tracers);
+  const toggleTracerEnabled = useMechanismStore((s) => s.toggleTracerEnabled);
+  const removeTracer = useMechanismStore((s) => s.removeTracer);
   const colliders = useMechanismStore((s) => s.colliders);
   const addBodyToCollider = useMechanismStore((s) => s.addBodyToCollider);
   const removeBodyFromCollider = useMechanismStore((s) => s.removeBodyFromCollider);
@@ -116,7 +119,8 @@ export function BodyPanel() {
         const colliderHasBody = selectedCollider ? selectedCollider.bodyIds.includes(body.id) : false;
         const bodyOutlines = Object.values(outlines).filter((o) => o.bodyId === body.id);
         const bodyImages = Object.values(images).filter((img) => img.bodyId === body.id);
-        const hasChildren = bodyOutlines.length > 0 || bodyImages.length > 0;
+        const bodyTracers = Object.values(tracers).filter((t) => t.bodyId === body.id);
+        const hasChildren = bodyOutlines.length > 0 || bodyImages.length > 0 || bodyTracers.length > 0;
         const isCollapsed = collapsedBodies.has(body.id);
 
         return (
@@ -441,6 +445,42 @@ export function BodyPanel() {
                         {Math.round(img.opacity * 100)}%
                       </span>
                     </div>
+                  </div>
+                ))}
+
+                {/* Tracers */}
+                {bodyTracers.map((tracer) => (
+                  <div
+                    key={tracer.id}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 4,
+                      padding: '2px 6px', marginBottom: 1,
+                      borderRadius: 3, fontSize: 11,
+                      backgroundColor: selectedIds.has(tracer.id) ? 'rgba(74,158,255,0.15)' : 'transparent',
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => select(tracer.id)}
+                  >
+                    <button
+                      onClick={(ev) => { ev.stopPropagation(); toggleTracerEnabled(tracer.id); }}
+                      title={tracer.enabled ? 'Disable tracer' : 'Enable tracer'}
+                      style={{
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        padding: '0 1px', color: tracer.enabled ? '#aaa' : '#555',
+                        lineHeight: 1, display: 'flex', alignItems: 'center',
+                      }}
+                    >
+                      {tracer.enabled ? <EyeIcon /> : <EyeOffIcon />}
+                    </button>
+                    <span style={{ flex: 1, color: '#aaa' }}>Path Plotter</span>
+                    <button
+                      className="tool-btn"
+                      style={{ fontSize: 10, padding: '1px 4px' }}
+                      onClick={(ev) => { ev.stopPropagation(); removeTracer(tracer.id); }}
+                      title="Remove tracer"
+                    >
+                      x
+                    </button>
                   </div>
                 ))}
               </div>

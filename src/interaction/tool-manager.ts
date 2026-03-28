@@ -203,9 +203,14 @@ function handleArcHover(worldPos: Vec2, editor: ReturnType<typeof useEditorStore
             }
           }
         }
-        const newReady = new Set(arc.readyToToggle);
-        newReady.delete(body.id);
-        editor.setArcSelector({ ...arc, readyToToggle: newReady, lastToggleTime: Date.now(), lastToggle: { bodyId: body.id, wasAdded } });
+        if (arc.tracerId) {
+          // Single-select: keep all bodies ready, just record the change
+          editor.setArcSelector({ ...arc, lastToggleTime: Date.now(), lastToggle: { bodyId: body.id, wasAdded } });
+        } else {
+          const newReady = new Set(arc.readyToToggle);
+          newReady.delete(body.id);
+          editor.setArcSelector({ ...arc, readyToToggle: newReady, lastToggleTime: Date.now(), lastToggle: { bodyId: body.id, wasAdded } });
+        }
       }
     } else {
       // Cursor is outside — mark as ready to toggle again
@@ -284,6 +289,9 @@ let imageDragType: 'move' | 'rotate' | 'scale' | null = null;
 let imageDragStart: Vec2 = { x: 0, y: 0 };
 let imageStartRotation = 0;
 let imageStartScale = 1;
+
+// Tracer drag state
+let tracerDragId: string | null = null;
 
 // Long-press arc selector state
 let longPressTimer: ReturnType<typeof setTimeout> | null = null;
@@ -608,6 +616,8 @@ export function handleMouseDown(e: PointerEvent, canvas: HTMLCanvasElement) {
       const worldPt = localToWorld(tracer.localPosition, transform);
       if (distance(worldPos, worldPt) < HIT_RADIUS / editor.camera.zoom) {
         editor.select(tracer.id);
+        tracerDragId = tracer.id;
+        mechanism.pushHistory();
         startTracerArcTimer(tracer.id, e.clientX, e.clientY);
         return;
       }
@@ -619,7 +629,15 @@ export function handleMouseDown(e: PointerEvent, canvas: HTMLCanvasElement) {
     }
 
     // Place a tracer on the active body (radio-select, single body)
-    const activeBodyId = [...editor.activeBodyIds][0];
+    let activeBodyId = [...editor.activeBodyIds][0];
+    if (!activeBodyId) {
+      // Auto-select first non-base body if none active
+      const nonBase = Object.values(mechanism.bodies).find((b) => b.id !== mechanism.baseBodyId);
+      if (nonBase) {
+        activeBodyId = nonBase.id;
+        editor.setActiveBody(nonBase.id);
+      }
+    }
     if (!activeBodyId || !mechanism.bodies[activeBodyId]) return;
 
     const pos = editor.gridEnabled ? snapToGrid(worldPos, editor.gridSize) : worldPos;
@@ -936,6 +954,22 @@ export function handleMouseMove(e: PointerEvent, canvas: HTMLCanvasElement) {
     return;
   }
 
+  // Tracer dragging
+  if (tracerDragId) {
+    const mech = useMechanismStore.getState();
+    const tracer = mech.tracers[tracerDragId];
+    if (tracer) {
+      const body = mech.bodies[tracer.bodyId];
+      if (body) {
+        const transform = computeBodyTransform(body, mech.joints);
+        const snappedWorld = editor.gridEnabled && !e.altKey ? snapToGrid(worldPos, editor.gridSize) : worldPos;
+        const localPt = worldToLocal(snappedWorld, transform);
+        mech.moveTracer(tracerDragId, localPt);
+      }
+    }
+    return;
+  }
+
   // Outline vertex dragging
   if (outlineVertexDragIndex !== null && outlineVertexDragOutlineId) {
     const outline = mechanism.outlines[outlineVertexDragOutlineId];
@@ -1079,6 +1113,7 @@ export function handleMouseUp(_e: PointerEvent | MouseEvent, canvas?: HTMLCanvas
   imageDragId = null;
   imageDragType = null;
   sliderLineDragId = null;
+  tracerDragId = null;
   sliderLineDragStartPositions = null;
   outlineVertexDragIndex = null;
   outlineVertexDragOutlineId = null;
