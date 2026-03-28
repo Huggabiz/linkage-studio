@@ -42,7 +42,7 @@ export interface RenderState {
   colliderPointA?: Vec2 | null;
   editingOutlineId?: string | null;
   editingVertexIndex?: number | null;
-  arcSelector?: { jointId: string; position: Vec2; showTime: number; collapseTime: number | null } | null;
+  arcSelector?: { jointId: string | null; colliderId: string | null; position: Vec2; showTime: number; collapseTime: number | null } | null;
 }
 
 export function render(
@@ -171,8 +171,16 @@ export function render(
     const positions = getArcCirclePositions(state.arcSelector.position, bodies.length, state.camera);
     const colors = bodies.map((b) => b.color);
     const names = bodies.map((b) => b.name);
-    const joint = state.joints[state.arcSelector.jointId];
-    const selected = bodies.map((b) => joint ? b.jointIds.includes(state.arcSelector!.jointId) : false);
+    let selected: boolean[];
+    if (state.arcSelector.colliderId) {
+      // Collider mode: show which bodies the barrier is assigned to
+      const collider = state.colliders[state.arcSelector.colliderId];
+      selected = bodies.map((b) => collider ? collider.bodyIds.includes(b.id) : false);
+    } else {
+      // Joint mode: show which bodies the joint is in
+      const joint = state.arcSelector.jointId ? state.joints[state.arcSelector.jointId] : null;
+      selected = bodies.map((b) => joint ? b.jointIds.includes(state.arcSelector!.jointId!) : false);
+    }
     drawArcSelector(ctx, positions, colors, selected, names, state.arcSelector.showTime, state.arcSelector.collapseTime);
   }
 }
