@@ -661,12 +661,14 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
 
     const newJoints = { ...get().joints };
     const newOutlines = { ...get().outlines };
+    const newTracers = { ...get().tracers };
     reprojectOutlines(newOutlines, bodyId, oldBodies[bodyId], newBodies[bodyId], get().joints, newJoints);
+    reprojectTracers(newTracers, bodyId, oldBodies[bodyId], newBodies[bodyId], get().joints, newJoints);
     syncJointTypes(newJoints, newBodies, get().baseBodyId);
     const { newLinks, angleConstraints: newAngle } = regenConstraints(newBodies, newJoints, get().sliders);
     updateJointConnections(newJoints, newLinks);
 
-    set({ bodies: newBodies, joints: newJoints, links: newLinks, outlines: newOutlines, angleConstraints: newAngle });
+    set({ bodies: newBodies, joints: newJoints, links: newLinks, outlines: newOutlines, tracers: newTracers, angleConstraints: newAngle });
   },
 
   removeJointFromBody(jointId, bodyId) {
@@ -679,12 +681,14 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
 
     const newJoints = { ...get().joints };
     const newOutlines = { ...get().outlines };
+    const newTracers = { ...get().tracers };
     reprojectOutlines(newOutlines, bodyId, oldBodies[bodyId], newBodies[bodyId], get().joints, newJoints);
+    reprojectTracers(newTracers, bodyId, oldBodies[bodyId], newBodies[bodyId], get().joints, newJoints);
     syncJointTypes(newJoints, newBodies, get().baseBodyId);
     const { newLinks, angleConstraints: newAngle } = regenConstraints(newBodies, newJoints, get().sliders);
     updateJointConnections(newJoints, newLinks);
 
-    set({ bodies: newBodies, joints: newJoints, links: newLinks, outlines: newOutlines, angleConstraints: newAngle });
+    set({ bodies: newBodies, joints: newJoints, links: newLinks, outlines: newOutlines, tracers: newTracers, angleConstraints: newAngle });
   },
 
   regenerateLinks() {
@@ -832,6 +836,25 @@ function syncJointTypes(
  * Converts local points to world using the OLD transform, then back to local using the NEW transform.
  * This preserves the world-space positions of the outline.
  */
+function reprojectTracers(
+  tracers: Record<string, Tracer>,
+  bodyId: string,
+  oldBody: Body,
+  newBody: Body,
+  oldJoints: Record<string, Joint>,
+  newJoints: Record<string, Joint>,
+) {
+  const oldTransform = computeBodyTransform(oldBody, oldJoints);
+  const newTransform = computeBodyTransform(newBody, newJoints);
+
+  for (const id of Object.keys(tracers)) {
+    if (tracers[id].bodyId !== bodyId) continue;
+    const worldPt = localToWorld(tracers[id].localPosition, oldTransform);
+    const newLocalPt = worldToLocal(worldPt, newTransform);
+    tracers[id] = { ...tracers[id], localPosition: newLocalPt };
+  }
+}
+
 function reprojectOutlines(
   outlines: Record<string, Outline>,
   bodyId: string,
