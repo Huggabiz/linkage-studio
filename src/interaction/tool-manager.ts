@@ -686,7 +686,34 @@ export function handleMouseDown(e: PointerEvent, canvas: HTMLCanvasElement) {
     mechanism.pushHistory();
     startArcTimer(joint.id, e.clientX, e.clientY);
   } else if (editor.selectedIds.size > 0) {
+    // Deselect, but start a timer — if held, place a new joint + arc selector
     editor.clearSelection();
+    const pos2 = editor.gridEnabled ? snapToGrid(worldPos, editor.gridSize) : worldPos;
+    longPressStartScreen = { x: e.clientX, y: e.clientY };
+    longPressJointId = '__deferred_place__';
+    if (longPressTimer) clearTimeout(longPressTimer);
+    longPressTimer = setTimeout(() => {
+      if (longPressJointId === '__deferred_place__') {
+        const activeBodyIds2 = Array.from(useEditorStore.getState().activeBodyIds);
+        const newId = useMechanismStore.getState().addJoint('revolute', pos2, activeBodyIds2);
+        startArcTimer(newId, e.clientX, e.clientY);
+        // Fire the arc immediately since we've already waited
+        if (longPressTimer) clearTimeout(longPressTimer);
+        longPressTimer = null;
+        const j = useMechanismStore.getState().joints[newId];
+        if (j && !j.hidden) {
+          useEditorStore.getState().setArcSelector({
+            jointId: newId,
+            colliderId: null,
+            position: { ...j.position },
+            showTime: Date.now(),
+            collapseTime: null,
+            readyToToggle: new Set(Object.keys(useMechanismStore.getState().bodies)),
+          });
+        }
+      }
+      longPressTimer = null;
+    }, LONG_PRESS_MS);
   } else {
     const pos = editor.gridEnabled ? snapToGrid(worldPos, editor.gridSize) : worldPos;
     const activeBodyIds = Array.from(editor.activeBodyIds);
