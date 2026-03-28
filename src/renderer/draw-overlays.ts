@@ -505,7 +505,7 @@ export function drawArcSelector(
       // The radial angle points outward; we rotate 90° CCW from that so
       // the text baseline faces the CCW side.
       const radialAngle = Math.atan2(nry, nrx);
-      const textAngle = radialAngle - Math.PI / 2;
+      const textAngle = radialAngle - Math.PI;
       const textAlign: CanvasTextAlign = 'left';
 
       ctx.save();
