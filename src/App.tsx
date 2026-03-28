@@ -97,13 +97,10 @@ function App() {
           }
         }
 
-        // Build set of joint IDs in CoM-enabled bodies (to suppress per-link gravity vectors)
-        let comJointIds: Set<string> | undefined;
+        // Build per-body joint sets for CoM bodies (to suppress per-link gravity vectors)
+        let comBodyJointSets: Set<string>[] | undefined;
         if (bodiesWithCOM.length > 0) {
-          comJointIds = new Set<string>();
-          for (const body of bodiesWithCOM) {
-            for (const jid of body.jointIds) comJointIds.add(jid);
-          }
+          comBodyJointSets = bodiesWithCOM.map((b) => new Set(b.jointIds));
         }
 
         // Compute collider initial sides on first simulate frame
@@ -157,7 +154,7 @@ function App() {
           mech.colliders,
           colliderSidesRef.current ?? undefined,
           mech.bodies,
-          comJointIds,
+          comBodyJointSets,
         );
 
         sim.setSolverResult(result);

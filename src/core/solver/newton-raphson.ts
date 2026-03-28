@@ -178,7 +178,7 @@ export function solveWithForce(
   colliders?: Record<string, ColliderConstraint>,
   colliderSides?: Map<string, number>,
   bodiesRef?: Record<string, { jointIds: string[] }>,
-  comJointIds?: Set<string>,
+  comBodyJointSets?: Set<string>[],
 ): SolverResult {
   const freeJoints: Joint[] = [];
   const jointIndex = new Map<string, number>();
@@ -621,9 +621,11 @@ export function solveWithForce(
     const posBy = idxB !== undefined ? q[idxB + 1] : jB.position.y;
 
     if (gravity.enabled && (idxA !== undefined || idxB !== undefined)) {
-      // Skip per-link gravity vectors for joints in CoM-enabled bodies
-      // (those bodies show gravity via the CoM marker instead)
-      const inComBody = comJointIds && comJointIds.has(jA.id) && comJointIds.has(jB.id);
+      // Skip per-link gravity vectors when both joints are in the SAME
+      // CoM-enabled body (that body shows gravity via its CoM marker instead)
+      const inComBody = comBodyJointSets && comBodyJointSets.some(
+        (s) => s.has(jA.id) && s.has(jB.id)
+      );
       if (!inComBody) {
         const wA = jointGravityWeights?.get(jA.id) ?? 1;
         const wB = jointGravityWeights?.get(jB.id) ?? 1;
