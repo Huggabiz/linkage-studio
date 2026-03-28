@@ -42,7 +42,7 @@ export interface RenderState {
   colliderPointA?: Vec2 | null;
   editingOutlineId?: string | null;
   editingVertexIndex?: number | null;
-  arcSelector?: { jointId: string | null; colliderId: string | null; position: Vec2; showTime: number; collapseTime: number | null } | null;
+  arcSelector?: { jointId: string | null; colliderId: string | null; position: Vec2; showTime: number; collapseTime: number | null; createdBodyId: string | null } | null;
 }
 
 export function render(
@@ -182,6 +182,6 @@ export function render(
       selected = bodies.map((b) => joint ? b.jointIds.includes(state.arcSelector!.jointId!) : false);
     }
     const addBtnPos = getArcAddButtonPosition(state.arcSelector.position, bodies.length, state.camera);
-    drawArcSelector(ctx, positions, colors, selected, names, state.arcSelector.showTime, state.arcSelector.collapseTime, addBtnPos);
+    drawArcSelector(ctx, positions, colors, selected, names, state.arcSelector.showTime, state.arcSelector.collapseTime, addBtnPos, !!state.arcSelector.createdBodyId);
   }
 }

@@ -23,7 +23,7 @@ function startArcTimer(jointId: string, screenX: number, screenY: number) {
           position: { ...j.position },
           showTime: Date.now(),
           collapseTime: null,
-          readyToToggle: new Set(Object.keys(useMechanismStore.getState().bodies)),
+          readyToToggle: new Set([...Object.keys(useMechanismStore.getState().bodies), '__add_body__']), createdBodyId: null,
         });
         isDragging = false;
         dragJointId = null;
@@ -48,7 +48,7 @@ function startColliderArcTimer(colliderId: string, worldPos: Vec2, screenX: numb
         position: { ...worldPos },
         showTime: Date.now(),
         collapseTime: null,
-        readyToToggle: new Set(Object.keys(mech.bodies)),
+        readyToToggle: new Set([...Object.keys(mech.bodies), '__add_body__']), createdBodyId: null,
       });
     }
     longPressTimer = null;
@@ -174,6 +174,28 @@ function handleArcHover(worldPos: Vec2, editor: ReturnType<typeof useEditorStore
         newReady.add(body.id);
         editor.setArcSelector({ ...arc, readyToToggle: newReady });
       }
+    }
+  }
+
+  // "Add Body" button hover toggle (one-way: create only, no undo on re-hover)
+  if (!arc.createdBodyId) {
+    const addPos = getArcAddButtonPosition(arc.position, bodies.length, editor.camera);
+    const addDx = cursorScreenX - addPos.screenX;
+    const addDy = cursorScreenY - addPos.screenY;
+    const addDist = Math.sqrt(addDx * addDx + addDy * addDy);
+
+    if (addDist < 10 && arc.readyToToggle.has('__add_body__')) {
+      const freshMech = useMechanismStore.getState();
+      const newBodyId = freshMech.addBody('Body');
+      const freshMech2 = useMechanismStore.getState();
+      if (arc.jointId) {
+        freshMech2.addJointToBody(arc.jointId, newBodyId);
+      } else if (arc.colliderId) {
+        freshMech2.addBodyToCollider(arc.colliderId, newBodyId);
+      }
+      const newReady = new Set(arc.readyToToggle);
+      newReady.delete('__add_body__');
+      editor.setArcSelector({ ...arc, readyToToggle: newReady, createdBodyId: newBodyId });
     }
   }
 }
@@ -732,7 +754,7 @@ export function handleMouseDown(e: PointerEvent, canvas: HTMLCanvasElement) {
             position: { ...j.position },
             showTime: Date.now(),
             collapseTime: null,
-            readyToToggle: new Set(Object.keys(useMechanismStore.getState().bodies)),
+            readyToToggle: new Set([...Object.keys(useMechanismStore.getState().bodies), '__add_body__']), createdBodyId: null,
           });
         }
       }
@@ -940,34 +962,10 @@ export function handleMouseUp(_e: PointerEvent | MouseEvent, canvas?: HTMLCanvas
   longPressJointId = null;
   longPressStartScreen = null;
 
-  // Arc selector: check if releasing on "Add Body" button, then collapse
+  // Arc selector: start collapse animation on release
   if (editor.arcSelector && !editor.arcSelector.collapseTime) {
     const arc = editor.arcSelector;
-    const mech = useMechanismStore.getState();
-    const bodyCount = Object.keys(mech.bodies).length;
-
-    // Check if cursor is over the "Add Body" button
-    if (canvas) {
-      const rect = canvas.getBoundingClientRect();
-      const cursorScreenX = _e.clientX - rect.left;
-      const cursorScreenY = _e.clientY - rect.top;
-      const addPos = getArcAddButtonPosition(arc.position, bodyCount, editor.camera);
-      const dx = cursorScreenX - addPos.screenX;
-      const dy = cursorScreenY - addPos.screenY;
-      if (Math.sqrt(dx * dx + dy * dy) < 14) {
-        // Create a new body and assign the joint/collider to it
-        const newBodyId = mech.addBody('Body');
-        // Re-read store after addBody to ensure fresh state
-        const freshMech = useMechanismStore.getState();
-        if (arc.jointId) {
-          freshMech.addJointToBody(arc.jointId, newBodyId);
-        } else if (arc.colliderId) {
-          freshMech.addBodyToCollider(arc.colliderId, newBodyId);
-        }
-      }
-    }
-
-    // Start collapse animation
+    const bodyCount = Object.keys(useMechanismStore.getState().bodies).length;
     editor.setArcSelector({ ...arc, collapseTime: Date.now() });
     const staggerPerCircle = bodyCount > 1 ? Math.min(50, 400 / (bodyCount - 1)) : 50;
     const totalDuration = (bodyCount - 1) * staggerPerCircle + 250;

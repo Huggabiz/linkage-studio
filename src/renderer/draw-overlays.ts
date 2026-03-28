@@ -414,6 +414,7 @@ export function drawArcSelector(
   showTime: number,
   collapseTime: number | null,
   addButtonPos?: { screenX: number; screenY: number; centerScreenX: number; centerScreenY: number },
+  addButtonActive?: boolean,
 ) {
   const now = Date.now();
   const CIRCLE_RADIUS = 12;
@@ -545,10 +546,15 @@ export function drawArcSelector(
       ctx.globalAlpha = addEased * 0.7;
       ctx.beginPath();
       ctx.arc(addX, addY, addR, 0, Math.PI * 2);
-      ctx.fillStyle = '#555';
+      ctx.fillStyle = addButtonActive ? '#4a7a4a' : '#555';
       ctx.fill();
-      ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-      ctx.lineWidth = 1;
+      if (addButtonActive) {
+        ctx.strokeStyle = '#2196F3';
+        ctx.lineWidth = 2.5;
+      } else {
+        ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+        ctx.lineWidth = 1;
+      }
       ctx.stroke();
 
       // Plus icon
