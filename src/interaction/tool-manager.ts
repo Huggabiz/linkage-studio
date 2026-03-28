@@ -627,7 +627,43 @@ export function handleMouseDown(e: PointerEvent, canvas: HTMLCanvasElement) {
     }
 
     if (editor.selectedIds.size > 0) {
+      // Deselect, but start a timer — if held, place a new tracer + arc selector
       editor.clearSelection();
+      const pos2 = editor.gridEnabled ? snapToGrid(worldPos, editor.gridSize) : worldPos;
+      longPressStartScreen = { x: e.clientX, y: e.clientY };
+      longPressJointId = '__deferred_tracer__';
+      if (longPressTimer) clearTimeout(longPressTimer);
+      longPressTimer = setTimeout(() => {
+        if (longPressJointId === '__deferred_tracer__') {
+          const edState = useEditorStore.getState();
+          const mechState = useMechanismStore.getState();
+          let bodyId = [...edState.activeBodyIds][0];
+          if (!bodyId) {
+            const nonBase = Object.values(mechState.bodies).find((b) => b.id !== mechState.baseBodyId);
+            if (nonBase) { bodyId = nonBase.id; edState.setActiveBody(nonBase.id); }
+          }
+          if (bodyId && mechState.bodies[bodyId]) {
+            const body = mechState.bodies[bodyId];
+            const transform = computeBodyTransform(body, mechState.joints);
+            const localPt = worldToLocal(pos2, transform);
+            const newTracerId = mechState.addTracer(bodyId, localPt);
+            edState.select(newTracerId);
+            // Open arc immediately
+            const tracer = useMechanismStore.getState().tracers[newTracerId];
+            if (tracer) {
+              const worldPt = localToWorld(tracer.localPosition, computeBodyTransform(useMechanismStore.getState().bodies[bodyId], useMechanismStore.getState().joints));
+              edState.setArcSelector({
+                jointId: null, colliderId: null, tracerId: newTracerId,
+                position: { ...worldPt },
+                showTime: Date.now(), collapseTime: null,
+                readyToToggle: new Set([...Object.keys(useMechanismStore.getState().bodies), '__add_body__']),
+                createdBodyId: null, lastToggleTime: 0, lastToggle: null,
+              });
+            }
+          }
+        }
+        longPressTimer = null;
+      }, LONG_PRESS_MS);
       return;
     }
 
