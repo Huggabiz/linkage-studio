@@ -402,35 +402,62 @@ export function drawDragInteraction(
 
 /**
  * Draw the long-press arc body selector around a joint.
+ * Circles animate radially from the joint center to their arc positions.
  * Drawn in screen-space (call after resetCamera).
  */
 export function drawArcSelector(
   ctx: CanvasRenderingContext2D,
-  arcPositions: { screenX: number; screenY: number }[],
+  arcPositions: { screenX: number; screenY: number; centerScreenX: number; centerScreenY: number }[],
   bodyColors: string[],
   bodySelected: boolean[],
   showTime: number,
+  collapseTime: number | null,
 ) {
   const now = Date.now();
-  const elapsed = now - showTime;
-  const CIRCLE_RADIUS = 11;
+  const CIRCLE_RADIUS = 12;
+  const ANIM_DURATION = 180; // ms per circle
+  const STAGGER = 50; // ms between each circle
 
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
   for (let i = 0; i < arcPositions.length; i++) {
-    // Staggered animation: each circle delays 50ms
-    const circleElapsed = elapsed - i * 50;
-    if (circleElapsed < 0) continue;
-    const animT = Math.min(1, circleElapsed / 150); // 150ms ease-out
-    const scale = 0.3 + 0.7 * (1 - Math.pow(1 - animT, 3)); // cubic ease-out
+    const { screenX, screenY, centerScreenX, centerScreenY } = arcPositions[i];
 
-    const { screenX, screenY } = arcPositions[i];
-    const r = CIRCLE_RADIUS * scale;
+    let t: number; // 0 = at center, 1 = at final position
+    if (collapseTime !== null) {
+      // Collapsing: reverse order (last circle collapses first stays longest, but stagger from left)
+      // Actually user wants same left-to-right order for collapse
+      const collapseElapsed = now - collapseTime - i * STAGGER;
+      if (collapseElapsed < 0) {
+        t = 1; // not started collapsing yet
+      } else {
+        t = 1 - Math.min(1, collapseElapsed / ANIM_DURATION);
+      }
+    } else {
+      // Expanding
+      const expandElapsed = now - showTime - i * STAGGER;
+      if (expandElapsed < 0) { continue; } // not started yet
+      t = Math.min(1, expandElapsed / ANIM_DURATION);
+    }
+
+    if (t <= 0) continue; // fully collapsed
+
+    // Ease in-out (cubic)
+    const eased = t < 0.5
+      ? 4 * t * t * t
+      : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+    // Interpolate position from center to final
+    const drawX = centerScreenX + (screenX - centerScreenX) * eased;
+    const drawY = centerScreenY + (screenY - centerScreenY) * eased;
+    const r = CIRCLE_RADIUS * (0.4 + 0.6 * eased);
+    const alpha = eased;
 
     // Filled circle with body color
+    ctx.globalAlpha = alpha;
     ctx.beginPath();
-    ctx.arc(screenX, screenY, r, 0, Math.PI * 2);
+    ctx.arc(drawX, drawY, r, 0, Math.PI * 2);
     ctx.fillStyle = bodyColors[i];
     ctx.fill();
 
@@ -440,12 +467,13 @@ export function drawArcSelector(
       ctx.lineWidth = 2.5;
       ctx.stroke();
     } else {
-      ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+      ctx.strokeStyle = 'rgba(255,255,255,0.4)';
       ctx.lineWidth = 1;
       ctx.stroke();
     }
   }
 
+  ctx.globalAlpha = 1;
   ctx.restore();
 }
 

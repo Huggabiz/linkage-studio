@@ -13,24 +13,25 @@ export function getArcCirclePositions(
   jointWorldPos: Vec2,
   bodyCount: number,
   camera: { pan: Vec2; zoom: number },
-): { screenX: number; screenY: number; angle: number }[] {
-  const RADIUS = 45; // screen px from joint center
-  const MIN_SPAN_DEG = 30;
+): { screenX: number; screenY: number; centerScreenX: number; centerScreenY: number; angle: number }[] {
+  const RADIUS = 52; // screen px from joint center
+  const PER_CIRCLE_DEG = 38; // minimum angular spacing between circles
   const MAX_SPAN_DEG = 200;
-  // Arc centers at 345° (just left of top), expanding clockwise
   const startAngleDeg = 345;
-  const spanDeg = Math.min(MAX_SPAN_DEG, Math.max(MIN_SPAN_DEG, (bodyCount - 1) * 30));
+  const spanDeg = Math.min(MAX_SPAN_DEG, Math.max(PER_CIRCLE_DEG, (bodyCount - 1) * PER_CIRCLE_DEG));
   const centerScreenX = jointWorldPos.x * camera.zoom + camera.pan.x;
   const centerScreenY = jointWorldPos.y * camera.zoom + camera.pan.y;
 
-  const positions: { screenX: number; screenY: number; angle: number }[] = [];
+  const positions: { screenX: number; screenY: number; centerScreenX: number; centerScreenY: number; angle: number }[] = [];
   for (let i = 0; i < bodyCount; i++) {
     const t = bodyCount > 1 ? i / (bodyCount - 1) : 0;
-    const angleDeg = startAngleDeg - spanDeg * t; // counter-clockwise from start for left-side fan
-    const angleRad = (angleDeg - 90) * (Math.PI / 180); // convert to math angle (0=right, CCW)
+    const angleDeg = startAngleDeg - spanDeg * t;
+    const angleRad = (angleDeg - 90) * (Math.PI / 180);
     positions.push({
       screenX: centerScreenX + Math.cos(angleRad) * RADIUS,
       screenY: centerScreenY + Math.sin(angleRad) * RADIUS,
+      centerScreenX,
+      centerScreenY,
       angle: angleDeg,
     });
   }
@@ -631,6 +632,7 @@ export function handleMouseDown(e: PointerEvent, canvas: HTMLCanvasElement) {
             jointId: longPressJointId,
             position: { ...j.position },
             showTime: Date.now(),
+            collapseTime: null,
             readyToToggle: new Set(Object.keys(useMechanismStore.getState().bodies)),
           });
           isDragging = false; // prevent joint dragging while arc is shown
@@ -840,9 +842,15 @@ export function handleMouseUp(_e: PointerEvent | MouseEvent) {
   longPressJointId = null;
   longPressStartScreen = null;
 
-  // Dismiss arc selector on mouse release
-  if (editor.arcSelector) {
-    editor.setArcSelector(null);
+  // Start arc collapse animation on mouse release (don't clear immediately)
+  if (editor.arcSelector && !editor.arcSelector.collapseTime) {
+    editor.setArcSelector({ ...editor.arcSelector, collapseTime: Date.now() });
+    // Clear after animation completes (stagger + duration)
+    const bodyCount = Object.keys(useMechanismStore.getState().bodies).length;
+    const totalDuration = bodyCount * 50 + 200;
+    setTimeout(() => {
+      useEditorStore.getState().setArcSelector(null);
+    }, totalDuration);
   }
 
   // Clean up temporary joint from shape dragging

@@ -85,11 +85,10 @@ interface EditorStore {
   /** Long-press arc body selector state */
   arcSelector: {
     jointId: string;
-    /** World position of the joint */
     position: Vec2;
-    /** Timestamp when arc became visible (for animation) */
     showTime: number;
-    /** Set of body IDs that have been toggled this session (prevents re-toggling on same pass) */
+    /** If set, the arc is collapsing (reverse animation). Null while expanding. */
+    collapseTime: number | null;
     readyToToggle: Set<string>;
   } | null;
   setEditingOutline(outlineId: string | null): void;

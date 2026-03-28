@@ -42,7 +42,7 @@ export interface RenderState {
   colliderPointA?: Vec2 | null;
   editingOutlineId?: string | null;
   editingVertexIndex?: number | null;
-  arcSelector?: { jointId: string; position: Vec2; showTime: number } | null;
+  arcSelector?: { jointId: string; position: Vec2; showTime: number; collapseTime: number | null } | null;
 }
 
 export function render(
@@ -172,6 +172,6 @@ export function render(
     const colors = bodies.map((b) => b.color);
     const joint = state.joints[state.arcSelector.jointId];
     const selected = bodies.map((b) => joint ? b.jointIds.includes(state.arcSelector!.jointId) : false);
-    drawArcSelector(ctx, positions, colors, selected, state.arcSelector.showTime);
+    drawArcSelector(ctx, positions, colors, selected, state.arcSelector.showTime, state.arcSelector.collapseTime);
   }
 }
