@@ -420,7 +420,7 @@ export function drawArcSelector(
   const MAX_TOTAL_STAGGER = 400;
   const count = arcPositions.length;
   const STAGGER = count > 1 ? Math.min(50, MAX_TOTAL_STAGGER / (count - 1)) : 50;
-  const LABEL_OFFSET = 16; // px beyond circle center
+  const LABEL_OFFSET = 22; // px beyond circle center
   const LABEL_WIPE_DURATION = 120; // ms for text wipe
   const LABEL_DELAY = 80; // ms delay after circle lands before text starts
 
@@ -500,14 +500,13 @@ export function drawArcSelector(
       const labelX = screenX + nrx * LABEL_OFFSET;
       const labelY = screenY + nry * LABEL_OFFSET;
 
-      // Rotate text to align radially (readable: flip if pointing down-left)
-      let textAngle = Math.atan2(nry, nrx);
-      let textAlign: CanvasTextAlign = 'left';
-      // If text would be upside-down, flip it
-      if (textAngle > Math.PI / 2 || textAngle < -Math.PI / 2) {
-        textAngle += Math.PI;
-        textAlign = 'right';
-      }
+      // Rotate text to align radially — bottom of text always on the
+      // counter-clockwise (left at top) side for consistent reading direction.
+      // The radial angle points outward; we rotate 90° CCW from that so
+      // the text baseline faces the CCW side.
+      const radialAngle = Math.atan2(nry, nrx);
+      const textAngle = radialAngle - Math.PI / 2;
+      const textAlign: CanvasTextAlign = 'left';
 
       ctx.save();
       ctx.globalAlpha = labelT * alpha;
@@ -518,15 +517,11 @@ export function drawArcSelector(
       const textWidth = 80;
       const clipWidth = textWidth * labelT;
       ctx.beginPath();
-      if (textAlign === 'left') {
-        ctx.rect(0, -10, clipWidth, 20);
-      } else {
-        ctx.rect(-clipWidth, -10, clipWidth, 20);
-      }
+      ctx.rect(0, -10, clipWidth, 20);
       ctx.clip();
 
-      ctx.font = '9px -apple-system, BlinkMacSystemFont, sans-serif';
-      ctx.fillStyle = '#ddd';
+      ctx.font = '11px -apple-system, BlinkMacSystemFont, sans-serif';
+      ctx.fillStyle = '#444';
       ctx.textAlign = textAlign;
       ctx.textBaseline = 'middle';
       ctx.fillText(bodyNames[i], 0, 0);
