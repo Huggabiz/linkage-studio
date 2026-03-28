@@ -3,9 +3,10 @@ import type { CameraState } from '../types';
 import { applyCamera, resetCamera } from './camera';
 import { drawMechanism, drawOutlineGhost, drawSliderGhost, drawColliderGhost, drawOutlineEditMode } from './draw-mechanism';
 import { drawImages } from './draw-images';
-import { drawGrid, drawRulers, drawPathTraces, drawForceVectors, drawDragInteraction, drawModeBadge, drawHUD, clearCanvas, drawCOMMarkers } from './draw-overlays';
+import { drawGrid, drawRulers, drawPathTraces, drawForceVectors, drawDragInteraction, drawModeBadge, drawHUD, clearCanvas, drawCOMMarkers, drawArcSelector } from './draw-overlays';
 import { lerp } from '../core/math/vec2';
 import { computeBodyTransform, localToWorld, polygonCentroid, polygonArea } from '../core/body-transform';
+import { getArcCirclePositions } from '../interaction/tool-manager';
 
 export interface RenderState {
   joints: Record<string, Joint>;
@@ -41,6 +42,7 @@ export interface RenderState {
   colliderPointA?: Vec2 | null;
   editingOutlineId?: string | null;
   editingVertexIndex?: number | null;
+  arcSelector?: { jointId: string; position: Vec2; showTime: number } | null;
 }
 
 export function render(
@@ -157,4 +159,19 @@ export function render(
 
   drawHUD(ctx, w, h, state.dof, state.cursorWorld);
   drawModeBadge(ctx, w, state.mode);
+
+  // Arc body selector (screen-space, after resetCamera)
+  if (state.arcSelector) {
+    const bodies = Object.values(state.bodies);
+    bodies.sort((a, b) => {
+      if (a.id === state.baseBodyId) return -1;
+      if (b.id === state.baseBodyId) return 1;
+      return 0;
+    });
+    const positions = getArcCirclePositions(state.arcSelector.position, bodies.length, state.camera);
+    const colors = bodies.map((b) => b.color);
+    const joint = state.joints[state.arcSelector.jointId];
+    const selected = bodies.map((b) => joint ? b.jointIds.includes(state.arcSelector!.jointId) : false);
+    drawArcSelector(ctx, positions, colors, selected, state.arcSelector.showTime);
+  }
 }

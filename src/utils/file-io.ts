@@ -33,6 +33,7 @@ interface SlinkerFile {
   images?: Record<string, { id: string; bodyId: string; src: string; position: Vec2; scale: number; rotation: number; opacity: number; visible: boolean; naturalWidth: number; naturalHeight: number }>;
   sliders?: Record<string, { id: string; jointIdA: string; jointIdB: string; jointIdC: string; t: number }>;
   colliders?: Record<string, { id: string; jointIdA: string; jointIdC: string; bodyIds: string[] }>;
+  projectName?: string;
   viewPreferences?: ViewPreferences;
   simulationSettings?: SimulationSettings;
 }
@@ -46,6 +47,7 @@ export function serializeMechanism(
   images?: Record<string, CanvasImage>,
   sliders?: Record<string, SliderConstraint>,
   colliders?: Record<string, ColliderConstraint>,
+  projectName?: string,
   viewPreferences?: ViewPreferences,
   simulationSettings?: SimulationSettings,
 ): string {
@@ -103,6 +105,7 @@ export function serializeMechanism(
     }
   }
 
+  if (projectName) data.projectName = projectName;
   if (viewPreferences) data.viewPreferences = viewPreferences;
   if (simulationSettings) data.simulationSettings = simulationSettings;
 
@@ -118,6 +121,7 @@ export function deserializeMechanism(json: string): {
   images?: Record<string, CanvasImage>;
   sliders?: Record<string, SliderConstraint>;
   colliders?: Record<string, ColliderConstraint>;
+  projectName?: string;
   viewPreferences?: ViewPreferences;
   simulationSettings?: SimulationSettings;
 } | null {
@@ -196,6 +200,7 @@ export function deserializeMechanism(json: string): {
 
     return {
       joints, links, bodies, baseBodyId: data.baseBodyId, outlines, images, sliders, colliders,
+      projectName: data.projectName,
       viewPreferences: data.viewPreferences,
       simulationSettings: data.simulationSettings,
     };

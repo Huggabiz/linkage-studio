@@ -8,6 +8,88 @@ import { snapToGrid, distance, sub, dot, lengthSq } from '../core/math/vec2';
 import { computeBodyTransform, worldToLocal, localToWorld } from '../core/body-transform';
 import { HIT_RADIUS } from '../utils/constants';
 
+/** Compute the screen positions of arc selector body circles. */
+export function getArcCirclePositions(
+  jointWorldPos: Vec2,
+  bodyCount: number,
+  camera: { pan: Vec2; zoom: number },
+): { screenX: number; screenY: number; angle: number }[] {
+  const RADIUS = 45; // screen px from joint center
+  const MIN_SPAN_DEG = 30;
+  const MAX_SPAN_DEG = 200;
+  // Arc centers at 345° (just left of top), expanding clockwise
+  const startAngleDeg = 345;
+  const spanDeg = Math.min(MAX_SPAN_DEG, Math.max(MIN_SPAN_DEG, (bodyCount - 1) * 30));
+  const centerScreenX = jointWorldPos.x * camera.zoom + camera.pan.x;
+  const centerScreenY = jointWorldPos.y * camera.zoom + camera.pan.y;
+
+  const positions: { screenX: number; screenY: number; angle: number }[] = [];
+  for (let i = 0; i < bodyCount; i++) {
+    const t = bodyCount > 1 ? i / (bodyCount - 1) : 0;
+    const angleDeg = startAngleDeg - spanDeg * t; // counter-clockwise from start for left-side fan
+    const angleRad = (angleDeg - 90) * (Math.PI / 180); // convert to math angle (0=right, CCW)
+    positions.push({
+      screenX: centerScreenX + Math.cos(angleRad) * RADIUS,
+      screenY: centerScreenY + Math.sin(angleRad) * RADIUS,
+      angle: angleDeg,
+    });
+  }
+  return positions;
+}
+
+/** Handle cursor movement over arc body circles — toggle body membership on enter. */
+function handleArcHover(worldPos: Vec2, editor: ReturnType<typeof useEditorStore.getState>) {
+  const arc = editor.arcSelector;
+  if (!arc) return;
+  const mechanism = useMechanismStore.getState();
+  const bodies = Object.values(mechanism.bodies);
+  bodies.sort((a, b) => {
+    if (a.id === mechanism.baseBodyId) return -1;
+    if (b.id === mechanism.baseBodyId) return 1;
+    return 0;
+  });
+
+  const positions = getArcCirclePositions(arc.position, bodies.length, editor.camera);
+  const CIRCLE_RADIUS = 12; // screen px hit radius
+
+  // Convert world cursor to screen
+  const cursorScreenX = worldPos.x * editor.camera.zoom + editor.camera.pan.x;
+  const cursorScreenY = worldPos.y * editor.camera.zoom + editor.camera.pan.y;
+
+  for (let i = 0; i < bodies.length; i++) {
+    const body = bodies[i];
+    const pos = positions[i];
+    const dx = cursorScreenX - pos.screenX;
+    const dy = cursorScreenY - pos.screenY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    if (dist < CIRCLE_RADIUS) {
+      // Cursor is inside this circle — toggle if ready
+      if (arc.readyToToggle.has(body.id)) {
+        const joint = mechanism.joints[arc.jointId];
+        if (joint) {
+          if (body.jointIds.includes(arc.jointId)) {
+            mechanism.removeJointFromBody(arc.jointId, body.id);
+          } else {
+            mechanism.addJointToBody(arc.jointId, body.id);
+          }
+        }
+        // Mark as not ready until cursor leaves
+        const newReady = new Set(arc.readyToToggle);
+        newReady.delete(body.id);
+        editor.setArcSelector({ ...arc, readyToToggle: newReady });
+      }
+    } else {
+      // Cursor is outside — mark as ready to toggle again
+      if (!arc.readyToToggle.has(body.id)) {
+        const newReady = new Set(arc.readyToToggle);
+        newReady.add(body.id);
+        editor.setArcSelector({ ...arc, readyToToggle: newReady });
+      }
+    }
+  }
+}
+
 /** Exit outline editing mode and update frozen world points. */
 function exitOutlineEditMode() {
   const editor = useEditorStore.getState();
@@ -52,6 +134,13 @@ let imageDragType: 'move' | 'rotate' | 'scale' | null = null;
 let imageDragStart: Vec2 = { x: 0, y: 0 };
 let imageStartRotation = 0;
 let imageStartScale = 1;
+
+// Long-press arc selector state
+let longPressTimer: ReturnType<typeof setTimeout> | null = null;
+let longPressJointId: string | null = null;
+let longPressStartScreen: Vec2 | null = null;
+const LONG_PRESS_MS = 800;
+const LONG_PRESS_MOVE_THRESHOLD = 5; // px screen movement to cancel
 let imageStartPos: Vec2 = { x: 0, y: 0 };
 
 export function handleMouseDown(e: PointerEvent, canvas: HTMLCanvasElement) {
@@ -528,6 +617,28 @@ export function handleMouseDown(e: PointerEvent, canvas: HTMLCanvasElement) {
     isDragging = true;
     dragJointId = joint.id;
     mechanism.pushHistory();
+
+    // Start long-press timer for arc body selector
+    const screenPos2: Vec2 = { x: e.clientX, y: e.clientY };
+    longPressStartScreen = screenPos2;
+    longPressJointId = joint.id;
+    if (longPressTimer) clearTimeout(longPressTimer);
+    longPressTimer = setTimeout(() => {
+      if (longPressJointId) {
+        const j = useMechanismStore.getState().joints[longPressJointId];
+        if (j && !j.hidden) {
+          useEditorStore.getState().setArcSelector({
+            jointId: longPressJointId,
+            position: { ...j.position },
+            showTime: Date.now(),
+            readyToToggle: new Set(Object.keys(useMechanismStore.getState().bodies)),
+          });
+          isDragging = false; // prevent joint dragging while arc is shown
+          dragJointId = null;
+        }
+      }
+      longPressTimer = null;
+    }, LONG_PRESS_MS);
   } else if (editor.selectedIds.size > 0) {
     editor.clearSelection();
   } else {
@@ -563,6 +674,23 @@ export function handleMouseMove(e: PointerEvent, canvas: HTMLCanvasElement) {
   const rect = canvas.getBoundingClientRect();
   const screenPos: Vec2 = { x: e.clientX - rect.left, y: e.clientY - rect.top };
   const worldPos = screenToWorld(screenPos, editor.camera);
+
+  // Cancel long-press if cursor moved too far
+  if (longPressTimer && longPressStartScreen) {
+    const dx = e.clientX - longPressStartScreen.x;
+    const dy = e.clientY - longPressStartScreen.y;
+    if (Math.sqrt(dx * dx + dy * dy) > LONG_PRESS_MOVE_THRESHOLD) {
+      clearTimeout(longPressTimer);
+      longPressTimer = null;
+      longPressJointId = null;
+    }
+  }
+
+  // Arc selector hover toggle logic
+  if (editor.arcSelector) {
+    handleArcHover(worldPos, editor);
+    return; // block all other interactions while arc is shown
+  }
 
   if (isPanning) {
     const dx = screenPos.x - lastMouse.x;
@@ -706,6 +834,16 @@ export function handleMouseMove(e: PointerEvent, canvas: HTMLCanvasElement) {
 
 export function handleMouseUp(_e: PointerEvent | MouseEvent) {
   const editor = useEditorStore.getState();
+
+  // Cancel long-press timer
+  if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+  longPressJointId = null;
+  longPressStartScreen = null;
+
+  // Dismiss arc selector on mouse release
+  if (editor.arcSelector) {
+    editor.setArcSelector(null);
+  }
 
   // Clean up temporary joint from shape dragging
   if (editor.simDrag?.tempJointId) {
