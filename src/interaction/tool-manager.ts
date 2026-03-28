@@ -649,6 +649,7 @@ export function handleMouseDown(e: PointerEvent, canvas: HTMLCanvasElement) {
     const localPt = worldToLocal(pos, transform);
     const tracerId = mechanism.addTracer(activeBodyId, localPt);
     editor.select(tracerId);
+    startTracerArcTimer(tracerId, e.clientX, e.clientY);
     return;
   }
 
