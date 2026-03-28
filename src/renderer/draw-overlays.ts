@@ -410,15 +410,19 @@ export function drawArcSelector(
   arcPositions: { screenX: number; screenY: number; centerScreenX: number; centerScreenY: number }[],
   bodyColors: string[],
   bodySelected: boolean[],
+  bodyNames: string[],
   showTime: number,
   collapseTime: number | null,
 ) {
   const now = Date.now();
   const CIRCLE_RADIUS = 12;
   const ANIM_DURATION = 180; // ms per circle
-  const MAX_TOTAL_STAGGER = 400; // ms max total stagger across all circles
+  const MAX_TOTAL_STAGGER = 400;
   const count = arcPositions.length;
   const STAGGER = count > 1 ? Math.min(50, MAX_TOTAL_STAGGER / (count - 1)) : 50;
+  const LABEL_OFFSET = 16; // px beyond circle center
+  const LABEL_WIPE_DURATION = 120; // ms for text wipe
+  const LABEL_DELAY = 80; // ms delay after circle lands before text starts
 
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -426,24 +430,21 @@ export function drawArcSelector(
   for (let i = 0; i < arcPositions.length; i++) {
     const { screenX, screenY, centerScreenX, centerScreenY } = arcPositions[i];
 
-    let t: number; // 0 = at center, 1 = at final position
+    let t: number;
     if (collapseTime !== null) {
-      // Collapsing: reverse order (last circle collapses first stays longest, but stagger from left)
-      // Actually user wants same left-to-right order for collapse
       const collapseElapsed = now - collapseTime - i * STAGGER;
       if (collapseElapsed < 0) {
-        t = 1; // not started collapsing yet
+        t = 1;
       } else {
         t = 1 - Math.min(1, collapseElapsed / ANIM_DURATION);
       }
     } else {
-      // Expanding
       const expandElapsed = now - showTime - i * STAGGER;
-      if (expandElapsed < 0) { continue; } // not started yet
+      if (expandElapsed < 0) { continue; }
       t = Math.min(1, expandElapsed / ANIM_DURATION);
     }
 
-    if (t <= 0) continue; // fully collapsed
+    if (t <= 0) continue;
 
     // Ease in-out (cubic)
     const eased = t < 0.5
@@ -472,6 +473,65 @@ export function drawArcSelector(
       ctx.strokeStyle = 'rgba(255,255,255,0.4)';
       ctx.lineWidth = 1;
       ctx.stroke();
+    }
+
+    // Radial body name label — animated wipe from circle outward
+    if (bodyNames[i] && eased > 0.5) {
+      // Compute label wipe progress (starts after circle is mostly settled)
+      let labelT: number;
+      if (collapseTime !== null) {
+        // Collapse: text disappears first (reverse wipe)
+        const collapseElapsed = now - collapseTime - i * STAGGER;
+        labelT = collapseElapsed < 0 ? 1 : 1 - Math.min(1, collapseElapsed / (LABEL_WIPE_DURATION * 0.5));
+      } else {
+        const expandElapsed = now - showTime - i * STAGGER - ANIM_DURATION * 0.6 - LABEL_DELAY;
+        labelT = expandElapsed < 0 ? 0 : Math.min(1, expandElapsed / LABEL_WIPE_DURATION);
+      }
+      if (labelT <= 0) continue;
+
+      // Radial direction from center to circle
+      const rdx = screenX - centerScreenX;
+      const rdy = screenY - centerScreenY;
+      const rLen = Math.sqrt(rdx * rdx + rdy * rdy);
+      if (rLen < 1) continue;
+      const nrx = rdx / rLen, nry = rdy / rLen;
+
+      // Label position: beyond the circle along the radial
+      const labelX = screenX + nrx * LABEL_OFFSET;
+      const labelY = screenY + nry * LABEL_OFFSET;
+
+      // Rotate text to align radially (readable: flip if pointing down-left)
+      let textAngle = Math.atan2(nry, nrx);
+      let textAlign: CanvasTextAlign = 'left';
+      // If text would be upside-down, flip it
+      if (textAngle > Math.PI / 2 || textAngle < -Math.PI / 2) {
+        textAngle += Math.PI;
+        textAlign = 'right';
+      }
+
+      ctx.save();
+      ctx.globalAlpha = labelT * alpha;
+      ctx.translate(labelX, labelY);
+      ctx.rotate(textAngle);
+
+      // Clip to create a wipe effect: reveal text from left to right
+      const textWidth = 80;
+      const clipWidth = textWidth * labelT;
+      ctx.beginPath();
+      if (textAlign === 'left') {
+        ctx.rect(0, -10, clipWidth, 20);
+      } else {
+        ctx.rect(-clipWidth, -10, clipWidth, 20);
+      }
+      ctx.clip();
+
+      ctx.font = '9px -apple-system, BlinkMacSystemFont, sans-serif';
+      ctx.fillStyle = '#ddd';
+      ctx.textAlign = textAlign;
+      ctx.textBaseline = 'middle';
+      ctx.fillText(bodyNames[i], 0, 0);
+
+      ctx.restore();
     }
   }
 

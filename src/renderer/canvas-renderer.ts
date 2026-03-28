@@ -170,8 +170,9 @@ export function render(
     });
     const positions = getArcCirclePositions(state.arcSelector.position, bodies.length, state.camera);
     const colors = bodies.map((b) => b.color);
+    const names = bodies.map((b) => b.name);
     const joint = state.joints[state.arcSelector.jointId];
     const selected = bodies.map((b) => joint ? b.jointIds.includes(state.arcSelector!.jointId) : false);
-    drawArcSelector(ctx, positions, colors, selected, state.arcSelector.showTime, state.arcSelector.collapseTime);
+    drawArcSelector(ctx, positions, colors, selected, names, state.arcSelector.showTime, state.arcSelector.collapseTime);
   }
 }
