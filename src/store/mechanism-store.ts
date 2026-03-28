@@ -239,11 +239,20 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
 
   updateTracerBody(tracerId, bodyId) {
     get().pushHistory();
-    set((s) => {
-      const tracer = s.tracers[tracerId];
-      if (!tracer) return s;
-      return { tracers: { ...s.tracers, [tracerId]: { ...tracer, bodyId } } };
-    });
+    const { tracers, bodies, joints } = get();
+    const tracer = tracers[tracerId];
+    if (!tracer) return;
+    // Convert world position from old body frame to new body frame
+    const oldBody = bodies[tracer.bodyId];
+    const newBody = bodies[bodyId];
+    if (!oldBody || !newBody) return;
+    const oldTransform = computeBodyTransform(oldBody, joints);
+    const worldPt = localToWorld(tracer.localPosition, oldTransform);
+    const newTransform = computeBodyTransform(newBody, joints);
+    const newLocalPt = worldToLocal(worldPt, newTransform);
+    set((s) => ({
+      tracers: { ...s.tracers, [tracerId]: { ...tracer, bodyId, localPosition: newLocalPt } },
+    }));
   },
 
   moveTracer(id, localPosition) {
