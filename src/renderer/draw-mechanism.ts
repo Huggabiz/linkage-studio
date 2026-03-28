@@ -307,8 +307,8 @@ export function drawMechanism(
           break;
         }
       }
-      // Skip links where both endpoints are in the base body
-      if (!owningBody && baseJointIds.has(idA) && baseJointIds.has(idB)) continue;
+      // Never show links where both endpoints are in the base body
+      if (baseJointIds.has(idA) && baseJointIds.has(idB)) continue;
       // Skip if the owning body has links hidden
       if (owningBody && !owningBody.showLinks) continue;
       // Skip links involving hidden bracing joints
