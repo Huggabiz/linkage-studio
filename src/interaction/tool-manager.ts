@@ -23,7 +23,7 @@ function startArcTimer(jointId: string, screenX: number, screenY: number) {
           position: { ...j.position },
           showTime: Date.now(),
           collapseTime: null,
-          readyToToggle: new Set([...Object.keys(useMechanismStore.getState().bodies), '__add_body__']), createdBodyId: null,
+          readyToToggle: new Set([...Object.keys(useMechanismStore.getState().bodies), '__add_body__']), createdBodyId: null, lastToggleTime: 0, lastToggle: null,
         });
         isDragging = false;
         dragJointId = null;
@@ -48,7 +48,7 @@ function startColliderArcTimer(colliderId: string, worldPos: Vec2, screenX: numb
         position: { ...worldPos },
         showTime: Date.now(),
         collapseTime: null,
-        readyToToggle: new Set([...Object.keys(mech.bodies), '__add_body__']), createdBodyId: null,
+        readyToToggle: new Set([...Object.keys(mech.bodies), '__add_body__']), createdBodyId: null, lastToggleTime: 0, lastToggle: null,
       });
     }
     longPressTimer = null;
@@ -117,6 +117,8 @@ export function getArcAddButtonPosition(
 function handleArcHover(worldPos: Vec2, editor: ReturnType<typeof useEditorStore.getState>) {
   const arc = editor.arcSelector;
   if (!arc) return;
+  // No toggles during collapse animation
+  if (arc.collapseTime !== null) return;
   const mechanism = useMechanismStore.getState();
   const bodies = Object.values(mechanism.bodies);
   bodies.sort((a, b) => {
@@ -142,30 +144,33 @@ function handleArcHover(worldPos: Vec2, editor: ReturnType<typeof useEditorStore
     if (dist < CIRCLE_RADIUS) {
       // Cursor is inside this circle — toggle if ready
       if (arc.readyToToggle.has(body.id)) {
+        let wasAdded = false;
         if (arc.colliderId) {
-          // Collider mode: toggle barrier body assignment
           const collider = mechanism.colliders[arc.colliderId];
           if (collider) {
             if (collider.bodyIds.includes(body.id)) {
               mechanism.removeBodyFromCollider(arc.colliderId, body.id);
+              wasAdded = false;
             } else {
               mechanism.addBodyToCollider(arc.colliderId, body.id);
+              wasAdded = true;
             }
           }
         } else if (arc.jointId) {
-          // Joint mode: toggle joint body membership
           const joint = mechanism.joints[arc.jointId];
           if (joint) {
             if (body.jointIds.includes(arc.jointId)) {
               mechanism.removeJointFromBody(arc.jointId, body.id);
+              wasAdded = false;
             } else {
               mechanism.addJointToBody(arc.jointId, body.id);
+              wasAdded = true;
             }
           }
         }
         const newReady = new Set(arc.readyToToggle);
         newReady.delete(body.id);
-        editor.setArcSelector({ ...arc, readyToToggle: newReady });
+        editor.setArcSelector({ ...arc, readyToToggle: newReady, lastToggleTime: Date.now(), lastToggle: { bodyId: body.id, wasAdded } });
       }
     } else {
       // Cursor is outside — mark as ready to toggle again
@@ -754,7 +759,7 @@ export function handleMouseDown(e: PointerEvent, canvas: HTMLCanvasElement) {
             position: { ...j.position },
             showTime: Date.now(),
             collapseTime: null,
-            readyToToggle: new Set([...Object.keys(useMechanismStore.getState().bodies), '__add_body__']), createdBodyId: null,
+            readyToToggle: new Set([...Object.keys(useMechanismStore.getState().bodies), '__add_body__']), createdBodyId: null, lastToggleTime: 0, lastToggle: null,
           });
         }
       }
@@ -962,10 +967,25 @@ export function handleMouseUp(_e: PointerEvent | MouseEvent, canvas?: HTMLCanvas
   longPressJointId = null;
   longPressStartScreen = null;
 
-  // Arc selector: start collapse animation on release
+  // Arc selector: revert last-moment accidental toggle, then collapse
   if (editor.arcSelector && !editor.arcSelector.collapseTime) {
     const arc = editor.arcSelector;
-    const bodyCount = Object.keys(useMechanismStore.getState().bodies).length;
+    const mech = useMechanismStore.getState();
+
+    // Revert toggle if it happened within 150ms of release (accidental swipe)
+    const GRACE_MS = 150;
+    if (arc.lastToggle && (Date.now() - arc.lastToggleTime) < GRACE_MS) {
+      const { bodyId, wasAdded } = arc.lastToggle;
+      if (arc.colliderId) {
+        if (wasAdded) mech.removeBodyFromCollider(arc.colliderId, bodyId);
+        else mech.addBodyToCollider(arc.colliderId, bodyId);
+      } else if (arc.jointId) {
+        if (wasAdded) mech.removeJointFromBody(arc.jointId, bodyId);
+        else mech.addJointToBody(arc.jointId, bodyId);
+      }
+    }
+
+    const bodyCount = Object.keys(mech.bodies).length;
     editor.setArcSelector({ ...arc, collapseTime: Date.now() });
     const staggerPerCircle = bodyCount > 1 ? Math.min(50, 400 / (bodyCount - 1)) : 50;
     const totalDuration = (bodyCount - 1) * staggerPerCircle + 250;
