@@ -540,7 +540,7 @@ export function drawArcSelector(
       const addEased = addT < 0.5 ? 4 * addT * addT * addT : 1 - Math.pow(-2 * addT + 2, 3) / 2;
       const addX = addButtonPos.centerScreenX + (addButtonPos.screenX - addButtonPos.centerScreenX) * addEased;
       const addY = addButtonPos.centerScreenY + (addButtonPos.screenY - addButtonPos.centerScreenY) * addEased;
-      const addR = CIRCLE_RADIUS * (0.4 + 0.6 * addEased);
+      const addR = CIRCLE_RADIUS * 0.75 * (0.4 + 0.6 * addEased);
 
       ctx.globalAlpha = addEased * 0.7;
       ctx.beginPath();
