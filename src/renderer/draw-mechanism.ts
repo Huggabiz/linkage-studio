@@ -1,4 +1,4 @@
-import type { Joint, Link, Body, Outline, SliderConstraint, ColliderConstraint, Vec2 } from '../types';
+import type { Joint, Link, Body, Outline, SliderConstraint, ColliderConstraint, Tracer, Vec2 } from '../types';
 import { computeBodyTransform, localToWorld } from '../core/body-transform';
 import {
   JOINT_RADIUS, JOINT_RADIUS_FIXED, LINK_WIDTH,
@@ -248,6 +248,78 @@ export function drawColliderGhost(
   ctx.strokeStyle = '#666';
   ctx.lineWidth = 1.5 / zoom;
   ctx.stroke();
+}
+
+/** Draw tracer markers (target crosshair icons) at their world positions. */
+export function drawTracers(
+  ctx: CanvasRenderingContext2D,
+  tracers: Record<string, Tracer>,
+  bodies: Record<string, Body>,
+  joints: Record<string, Joint>,
+  zoom: number,
+  selectedIds: Set<string>,
+) {
+  for (const tracer of Object.values(tracers)) {
+    if (!tracer.enabled) continue;
+    const body = bodies[tracer.bodyId];
+    if (!body) continue;
+    const transform = computeBodyTransform(body, joints);
+    const worldPt = localToWorld(tracer.localPosition, transform);
+    const isSelected = selectedIds.has(tracer.id);
+
+    const r = 6 / zoom;
+    const crossLen = 10 / zoom;
+
+    // Crosshair lines
+    ctx.strokeStyle = isSelected ? SELECTION_COLOR : body.color;
+    ctx.lineWidth = 1.5 / zoom;
+    ctx.beginPath();
+    ctx.moveTo(worldPt.x - crossLen, worldPt.y);
+    ctx.lineTo(worldPt.x + crossLen, worldPt.y);
+    ctx.moveTo(worldPt.x, worldPt.y - crossLen);
+    ctx.lineTo(worldPt.x, worldPt.y + crossLen);
+    ctx.stroke();
+
+    // Small circle
+    ctx.beginPath();
+    ctx.arc(worldPt.x, worldPt.y, r, 0, Math.PI * 2);
+    ctx.strokeStyle = isSelected ? SELECTION_COLOR : body.color;
+    ctx.lineWidth = 1.5 / zoom;
+    ctx.stroke();
+
+    // Filled center dot
+    ctx.beginPath();
+    ctx.arc(worldPt.x, worldPt.y, 2 / zoom, 0, Math.PI * 2);
+    ctx.fillStyle = body.color;
+    ctx.fill();
+  }
+}
+
+/** Draw tracer path traces (colored lines). */
+export function drawTracerPaths(
+  ctx: CanvasRenderingContext2D,
+  tracerPaths: Map<string, Vec2[]>,
+  tracers: Record<string, Tracer>,
+  bodies: Record<string, Body>,
+  zoom: number,
+) {
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 1.5 / zoom;
+
+  for (const [tracerId, points] of tracerPaths) {
+    if (points.length < 2) continue;
+    const tracer = tracers[tracerId];
+    if (!tracer || !tracer.enabled) continue;
+    const body = bodies[tracer.bodyId];
+    ctx.strokeStyle = body ? body.color : '#888';
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) {
+      ctx.lineTo(points[i].x, points[i].y);
+    }
+    ctx.stroke();
+  }
 }
 
 export function drawMechanism(

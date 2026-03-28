@@ -1,4 +1,4 @@
-import type { Joint, Link, Body, Outline, CanvasImage, SliderConstraint, ColliderConstraint, Vec2 } from '../types';
+import type { Joint, Link, Body, Outline, CanvasImage, SliderConstraint, ColliderConstraint, Tracer, Vec2 } from '../types';
 import type { GridLevel, CameraState } from '../types';
 
 declare const __APP_VERSION__: string;
@@ -33,6 +33,7 @@ interface SlinkerFile {
   images?: Record<string, { id: string; bodyId: string; src: string; position: Vec2; scale: number; rotation: number; opacity: number; visible: boolean; naturalWidth: number; naturalHeight: number }>;
   sliders?: Record<string, { id: string; jointIdA: string; jointIdB: string; jointIdC: string; t: number }>;
   colliders?: Record<string, { id: string; jointIdA: string; jointIdC: string; bodyIds: string[] }>;
+  tracers?: Record<string, { id: string; bodyId: string; localPosition: Vec2; enabled: boolean }>;
   projectName?: string;
   viewPreferences?: ViewPreferences;
   simulationSettings?: SimulationSettings;
@@ -47,6 +48,7 @@ export function serializeMechanism(
   images?: Record<string, CanvasImage>,
   sliders?: Record<string, SliderConstraint>,
   colliders?: Record<string, ColliderConstraint>,
+  tracers?: Record<string, Tracer>,
   projectName?: string,
   viewPreferences?: ViewPreferences,
   simulationSettings?: SimulationSettings,
@@ -105,6 +107,13 @@ export function serializeMechanism(
     }
   }
 
+  if (tracers && Object.keys(tracers).length > 0) {
+    data.tracers = {};
+    for (const [id, t] of Object.entries(tracers)) {
+      data.tracers[id] = { id: t.id, bodyId: t.bodyId, localPosition: { x: t.localPosition.x, y: t.localPosition.y }, enabled: t.enabled };
+    }
+  }
+
   if (projectName) data.projectName = projectName;
   if (viewPreferences) data.viewPreferences = viewPreferences;
   if (simulationSettings) data.simulationSettings = simulationSettings;
@@ -121,6 +130,7 @@ export function deserializeMechanism(json: string): {
   images?: Record<string, CanvasImage>;
   sliders?: Record<string, SliderConstraint>;
   colliders?: Record<string, ColliderConstraint>;
+  tracers?: Record<string, Tracer>;
   projectName?: string;
   viewPreferences?: ViewPreferences;
   simulationSettings?: SimulationSettings;
@@ -198,8 +208,15 @@ export function deserializeMechanism(json: string): {
       }
     }
 
+    const tracers: Record<string, Tracer> = {};
+    if (data.tracers) {
+      for (const [id, t] of Object.entries(data.tracers)) {
+        tracers[id] = { id: t.id, bodyId: t.bodyId, localPosition: { x: t.localPosition.x, y: t.localPosition.y }, enabled: t.enabled ?? true };
+      }
+    }
+
     return {
-      joints, links, bodies, baseBodyId: data.baseBodyId, outlines, images, sliders, colliders,
+      joints, links, bodies, baseBodyId: data.baseBodyId, outlines, images, sliders, colliders, tracers,
       projectName: data.projectName,
       viewPreferences: data.viewPreferences,
       simulationSettings: data.simulationSettings,

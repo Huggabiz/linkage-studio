@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Joint, Link, Body, Outline, CanvasImage, SliderConstraint, ColliderConstraint, AngleConstraint, JointType } from '../types';
+import type { Joint, Link, Body, Outline, CanvasImage, SliderConstraint, ColliderConstraint, Tracer, AngleConstraint, JointType } from '../types';
 import type { Vec2 } from '../types';
 import { createId } from '../utils/id';
 import { generateBodyLinks } from '../core/body-links';
@@ -15,6 +15,7 @@ interface HistorySnapshot {
   images: Record<string, CanvasImage>;
   sliders: Record<string, SliderConstraint>;
   colliders: Record<string, ColliderConstraint>;
+  tracers: Record<string, Tracer>;
 }
 
 const BASE_BODY_ID = 'base';
@@ -32,6 +33,7 @@ interface MechanismStore {
   images: Record<string, CanvasImage>;
   sliders: Record<string, SliderConstraint>;
   colliders: Record<string, ColliderConstraint>;
+  tracers: Record<string, Tracer>;
   angleConstraints: AngleConstraint[];
 
   past: HistorySnapshot[];
@@ -77,12 +79,17 @@ interface MechanismStore {
   removeBodyFromCollider(colliderId: string, bodyId: string): void;
   getColliderById(id: string): ColliderConstraint | undefined;
 
+  addTracer(bodyId: string, localPosition: Vec2): string;
+  removeTracer(id: string): void;
+  updateTracerBody(tracerId: string, bodyId: string): void;
+  toggleTracerEnabled(id: string): void;
+
   addTempJoint(position: Vec2, bodyId: string): string;
   removeTempJoint(id: string): void;
   reprojectOutlinesFromWorld(frozenWorldPoints: Map<string, Vec2[]>): void;
 
   clearAll(): void;
-  loadState(state: { joints: Record<string, Joint>; links: Record<string, Link>; bodies: Record<string, Body>; baseBodyId: string; outlines: Record<string, Outline>; images?: Record<string, CanvasImage>; sliders?: Record<string, SliderConstraint>; colliders?: Record<string, ColliderConstraint> }): void;
+  loadState(state: { joints: Record<string, Joint>; links: Record<string, Link>; bodies: Record<string, Body>; baseBodyId: string; outlines: Record<string, Outline>; images?: Record<string, CanvasImage>; sliders?: Record<string, SliderConstraint>; colliders?: Record<string, ColliderConstraint>; tracers?: Record<string, Tracer> }): void;
   pushHistory(): void;
   undo(): void;
   redo(): void;
@@ -102,6 +109,7 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
   images: {},
   sliders: {},
   colliders: {},
+  tracers: {},
   angleConstraints: [],
   past: [],
   future: [],
@@ -211,6 +219,40 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
     return get().colliders[id];
   },
 
+  addTracer(bodyId, localPosition) {
+    const id = createId();
+    get().pushHistory();
+    const tracer: Tracer = { id, bodyId, localPosition, enabled: true };
+    set((s) => ({ tracers: { ...s.tracers, [id]: tracer } }));
+    return id;
+  },
+
+  removeTracer(id) {
+    get().pushHistory();
+    set((s) => {
+      const newTracers = { ...s.tracers };
+      delete newTracers[id];
+      return { tracers: newTracers };
+    });
+  },
+
+  updateTracerBody(tracerId, bodyId) {
+    get().pushHistory();
+    set((s) => {
+      const tracer = s.tracers[tracerId];
+      if (!tracer) return s;
+      return { tracers: { ...s.tracers, [tracerId]: { ...tracer, bodyId } } };
+    });
+  },
+
+  toggleTracerEnabled(id) {
+    set((s) => {
+      const tracer = s.tracers[id];
+      if (!tracer) return s;
+      return { tracers: { ...s.tracers, [id]: { ...tracer, enabled: !tracer.enabled } } };
+    });
+  },
+
   addTempJoint(position, bodyId) {
     const id = '__temp_' + createId();
     const joint: Joint = { id, type: 'revolute', position, connectedLinkIds: [] };
@@ -312,6 +354,7 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
       images: {},
       sliders: {},
       colliders: {},
+      tracers: {},
       angleConstraints: [],
       past: [],
       future: [],
@@ -330,6 +373,7 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
       images: state.images || {},
       sliders,
       colliders: state.colliders || {},
+      tracers: state.tracers || {},
       angleConstraints: ac,
       past: [],
       future: [],
@@ -337,15 +381,15 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
   },
 
   pushHistory() {
-    const { joints, links, bodies, baseBodyId, outlines, images, sliders, colliders, past } = get();
+    const { joints, links, bodies, baseBodyId, outlines, images, sliders, colliders, tracers, past } = get();
     set({
-      past: [...past.slice(-50), { joints: { ...joints }, links: { ...links }, bodies: { ...bodies }, baseBodyId, outlines: { ...outlines }, images: { ...images }, sliders: { ...sliders }, colliders: { ...colliders } }],
+      past: [...past.slice(-50), { joints: { ...joints }, links: { ...links }, bodies: { ...bodies }, baseBodyId, outlines: { ...outlines }, images: { ...images }, sliders: { ...sliders }, colliders: { ...colliders }, tracers: { ...tracers } }],
       future: [],
     });
   },
 
   undo() {
-    const { past, joints, links, bodies, baseBodyId, outlines, images, sliders, colliders } = get();
+    const { past, joints, links, bodies, baseBodyId, outlines, images, sliders, colliders, tracers } = get();
     if (past.length === 0) return;
     const prev = past[past.length - 1];
     set({
@@ -357,13 +401,14 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
       images: prev.images || {},
       sliders: prev.sliders || {},
       colliders: prev.colliders || {},
+      tracers: prev.tracers || {},
       past: past.slice(0, -1),
-      future: [{ joints: { ...joints }, links: { ...links }, bodies: { ...bodies }, baseBodyId, outlines: { ...outlines }, images: { ...images }, sliders: { ...sliders }, colliders: { ...colliders } }, ...get().future],
+      future: [{ joints: { ...joints }, links: { ...links }, bodies: { ...bodies }, baseBodyId, outlines: { ...outlines }, images: { ...images }, sliders: { ...sliders }, colliders: { ...colliders }, tracers: { ...tracers } }, ...get().future],
     });
   },
 
   redo() {
-    const { future, joints, links, bodies, baseBodyId, outlines, images, sliders, colliders } = get();
+    const { future, joints, links, bodies, baseBodyId, outlines, images, sliders, colliders, tracers } = get();
     if (future.length === 0) return;
     const next = future[0];
     set({
@@ -375,8 +420,9 @@ export const useMechanismStore = create<MechanismStore>((set, get) => ({
       images: next.images || {},
       sliders: next.sliders || {},
       colliders: next.colliders || {},
+      tracers: next.tracers || {},
       future: future.slice(1),
-      past: [...get().past, { joints: { ...joints }, links: { ...links }, bodies: { ...bodies }, baseBodyId, outlines: { ...outlines }, images: { ...images }, sliders: { ...sliders }, colliders: { ...colliders } }],
+      past: [...get().past, { joints: { ...joints }, links: { ...links }, bodies: { ...bodies }, baseBodyId, outlines: { ...outlines }, images: { ...images }, sliders: { ...sliders }, colliders: { ...colliders }, tracers: { ...tracers } }],
     });
   },
 

@@ -41,6 +41,17 @@ const IconCollider = () => (
   </svg>
 );
 
+const IconTracer = () => (
+  <svg className="tool-icon-svg" viewBox="0 0 16 16" width="16" height="16">
+    <circle cx="8" cy="8" r="4" fill="none" stroke="currentColor" strokeWidth="1.2" />
+    <line x1="8" y1="1" x2="8" y2="5" stroke="currentColor" strokeWidth="1.2" />
+    <line x1="8" y1="11" x2="8" y2="15" stroke="currentColor" strokeWidth="1.2" />
+    <line x1="1" y1="8" x2="5" y2="8" stroke="currentColor" strokeWidth="1.2" />
+    <line x1="11" y1="8" x2="15" y2="8" stroke="currentColor" strokeWidth="1.2" />
+    <circle cx="8" cy="8" r="1" fill="currentColor" />
+  </svg>
+);
+
 const IconOutline = () => (
   <svg className="tool-icon-svg" viewBox="0 0 16 16" width="16" height="16">
     <polygon points="8,1 14,5 12,13 4,13 2,5" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
@@ -134,6 +145,7 @@ export function Toolbar() {
   const isPivotTool = createTool === 'joints';
   const isSliderTool = createTool === 'slider';
   const isColliderTool = createTool === 'collider';
+  const isTracerTool = createTool === 'tracer';
   const isJointsTool = isPivotTool || isSliderTool || isColliderTool;
 
   const renderHints = () => {
@@ -162,6 +174,15 @@ export function Toolbar() {
           <div className="sim-hint">Click again to place end C</div>
           <div className="sim-hint">Slider B auto-placed at midpoint</div>
           <div className="sim-hint">Escape to cancel</div>
+        </>
+      );
+    }
+    if (isTracerTool) {
+      return (
+        <>
+          <div className="sim-hint">Select a body, then click to place</div>
+          <div className="sim-hint">Traces path during simulation</div>
+          <div className="sim-hint">Hold on tracer to change body</div>
         </>
       );
     }
@@ -280,6 +301,17 @@ export function Toolbar() {
             >
               <IconImage />
               <span className="tool-name">Image</span>
+            </button>
+
+            {/* Sensors group */}
+            <div className="toolbar-group-label">Sensors</div>
+
+            <button
+              className={`tool-btn ${isTracerTool ? 'active' : ''}`}
+              onClick={() => setCreateTool('tracer')}
+            >
+              <IconTracer />
+              <span className="tool-name">Path Plotter</span>
             </button>
           </div>
 

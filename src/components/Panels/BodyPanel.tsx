@@ -74,7 +74,7 @@ export function BodyPanel() {
   const removeBodyFromCollider = useMechanismStore((s) => s.removeBodyFromCollider);
 
   const usedColors = new Set(Object.values(bodies).map((b) => b.color));
-  const isOutlineMode = createTool === 'outline';
+  const isOutlineMode = createTool === 'outline' || createTool === 'tracer';
 
   const selectedJointId = [...selectedIds].find((id) => joints[id]);
   const selectedColliderId = [...selectedIds].find((id) => colliders[id]);

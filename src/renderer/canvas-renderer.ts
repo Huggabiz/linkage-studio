@@ -1,7 +1,7 @@
-import type { Joint, Link, Body, Outline, CanvasImage, SliderConstraint, ColliderConstraint, Vec2, SimDragState, AppMode, ForceVector, CreateTool } from '../types';
+import type { Joint, Link, Body, Outline, CanvasImage, SliderConstraint, ColliderConstraint, Tracer, Vec2, SimDragState, AppMode, ForceVector, CreateTool } from '../types';
 import type { CameraState } from '../types';
 import { applyCamera, resetCamera } from './camera';
-import { drawMechanism, drawOutlineGhost, drawSliderGhost, drawColliderGhost, drawOutlineEditMode } from './draw-mechanism';
+import { drawMechanism, drawOutlineGhost, drawSliderGhost, drawColliderGhost, drawOutlineEditMode, drawTracers, drawTracerPaths } from './draw-mechanism';
 import { drawImages } from './draw-images';
 import { drawGrid, drawRulers, drawPathTraces, drawForceVectors, drawDragInteraction, drawModeBadge, drawHUD, clearCanvas, drawCOMMarkers, drawArcSelector } from './draw-overlays';
 import { lerp } from '../core/math/vec2';
@@ -16,6 +16,8 @@ export interface RenderState {
   images: Record<string, CanvasImage>;
   sliders: Record<string, SliderConstraint>;
   colliders: Record<string, ColliderConstraint>;
+  tracers: Record<string, Tracer>;
+  tracerPaths: Map<string, Vec2[]>;
   selectedIds: Set<string>;
   hoveredId: string | null;
   camera: CameraState;
@@ -42,7 +44,7 @@ export interface RenderState {
   colliderPointA?: Vec2 | null;
   editingOutlineId?: string | null;
   editingVertexIndex?: number | null;
-  arcSelector?: { jointId: string | null; colliderId: string | null; position: Vec2; showTime: number; collapseTime: number | null; createdBodyId: string | null } | null;
+  arcSelector?: { jointId: string | null; colliderId: string | null; tracerId: string | null; position: Vec2; showTime: number; collapseTime: number | null; createdBodyId: string | null } | null;
 }
 
 export function render(
@@ -72,6 +74,10 @@ export function render(
   drawMechanism(ctx, state.joints, state.links, state.bodies, state.outlines, state.sliders, state.colliders, state.selectedIds, state.hoveredId, state.camera.zoom, state.showLinks, state.baseBodyId, frozenPts);
 
   drawPathTraces(ctx, state.pathTraces, state.camera.zoom);
+
+  // Draw tracer paths and markers
+  drawTracerPaths(ctx, state.tracerPaths, state.tracers, state.bodies, state.camera.zoom);
+  drawTracers(ctx, state.tracers, state.bodies, state.joints, state.camera.zoom, state.selectedIds);
 
   // Outline edit mode overlay
   if (state.mode === 'create' && state.editingOutlineId) {
@@ -172,12 +178,14 @@ export function render(
     const colors = bodies.map((b) => b.color);
     const names = bodies.map((b) => b.name);
     let selected: boolean[];
-    if (state.arcSelector.colliderId) {
-      // Collider mode: show which bodies the barrier is assigned to
+    if (state.arcSelector.tracerId) {
+      // Tracer mode: single body highlighted
+      const tracer = state.tracers[state.arcSelector.tracerId];
+      selected = bodies.map((b) => tracer ? b.id === tracer.bodyId : false);
+    } else if (state.arcSelector.colliderId) {
       const collider = state.colliders[state.arcSelector.colliderId];
       selected = bodies.map((b) => collider ? collider.bodyIds.includes(b.id) : false);
     } else {
-      // Joint mode: show which bodies the joint is in
       const joint = state.arcSelector.jointId ? state.joints[state.arcSelector.jointId] : null;
       selected = bodies.map((b) => joint ? b.jointIds.includes(state.arcSelector!.jointId!) : false);
     }
