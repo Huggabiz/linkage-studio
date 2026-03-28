@@ -269,14 +269,36 @@ export function openFilePicker(): Promise<string | null> {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.slinker,.json,application/json,*/*';
+    // Append to DOM for iOS Safari reliability (GC can collect detached inputs)
+    input.style.position = 'fixed';
+    input.style.top = '-9999px';
+    input.style.left = '-9999px';
+    document.body.appendChild(input);
+
+    const cleanup = () => {
+      if (input.parentNode) input.parentNode.removeChild(input);
+    };
+
     input.onchange = () => {
       const file = input.files?.[0];
-      if (!file) { resolve(null); return; }
+      if (!file) { cleanup(); resolve(null); return; }
       const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = () => resolve(null);
+      reader.onload = () => { cleanup(); resolve(reader.result as string); };
+      reader.onerror = () => { cleanup(); resolve(null); };
       reader.readAsText(file);
     };
+
+    // Handle cancel (iOS doesn't always fire onchange on cancel)
+    window.addEventListener('focus', function onFocus() {
+      window.removeEventListener('focus', onFocus);
+      setTimeout(() => {
+        if (!input.files || input.files.length === 0) {
+          cleanup();
+          resolve(null);
+        }
+      }, 500);
+    }, { once: true });
+
     input.click();
   });
 }
