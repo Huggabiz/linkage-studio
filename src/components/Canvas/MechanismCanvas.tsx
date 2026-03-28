@@ -235,7 +235,7 @@ export function MechanismCanvas() {
         if (activePointers.size >= 2) {
           // Transition to pinch: cancel any in-progress single-pointer interaction
           if (gestureState === 'interact') {
-            handleMouseUp(e.nativeEvent as PointerEvent);
+            handleMouseUp(e.nativeEvent as PointerEvent, canvasRef.current!);
           }
           gestureState = 'pinch';
           lastPinchDist = null;
@@ -362,14 +362,14 @@ export function MechanismCanvas() {
 
         // --- MOUSE: pass through directly ---
         if (e.pointerType === 'mouse') {
-          handleMouseUp(e.nativeEvent as PointerEvent);
+          handleMouseUp(e.nativeEvent as PointerEvent, canvasRef.current!);
           return;
         }
 
         // --- PEN: pass through directly (like mouse) ---
         if (e.pointerType === 'pen') {
           try { canvas.releasePointerCapture(e.pointerId); } catch (_) { /* already released */ }
-          handleMouseUp(e.nativeEvent as PointerEvent);
+          handleMouseUp(e.nativeEvent as PointerEvent, canvasRef.current!);
           resetGesture();
           return;
         }
@@ -393,7 +393,7 @@ export function MechanismCanvas() {
 
         // Interact: finger lifted off a component drag → forward mouseUp to tool-manager
         if (gestureState === 'interact' && e.pointerId === touchStartPointerId) {
-          handleMouseUp(e.nativeEvent as PointerEvent);
+          handleMouseUp(e.nativeEvent as PointerEvent, canvasRef.current!);
           resetGesture();
           activePointers.clear();
           return;
@@ -407,7 +407,7 @@ export function MechanismCanvas() {
           cursorWorldRef.current = screenToWorld(screen, useEditorStore.getState().camera);
           // Fire down + up at the touch position to trigger the action (place joint, select, etc.)
           handleMouseDown(e.nativeEvent as PointerEvent, canvas);
-          handleMouseUp(e.nativeEvent as PointerEvent);
+          handleMouseUp(e.nativeEvent as PointerEvent, canvasRef.current!);
           resetGesture();
           activePointers.clear();
           return;
@@ -431,7 +431,7 @@ export function MechanismCanvas() {
 
         if (activePointers.size === 0) {
           if (gestureState === 'interact') {
-            handleMouseUp(e.nativeEvent as PointerEvent);
+            handleMouseUp(e.nativeEvent as PointerEvent, canvasRef.current!);
           }
           resetGesture();
           activePointers.clear();

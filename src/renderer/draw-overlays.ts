@@ -413,6 +413,7 @@ export function drawArcSelector(
   bodyNames: string[],
   showTime: number,
   collapseTime: number | null,
+  addButtonPos?: { screenX: number; screenY: number; centerScreenX: number; centerScreenY: number },
 ) {
   const now = Date.now();
   const CIRCLE_RADIUS = 12;
@@ -527,6 +528,63 @@ export function drawArcSelector(
       ctx.fillText(bodyNames[i], 0, 0);
 
       ctx.restore();
+    }
+  }
+
+  // Draw "Add Body" button at the end of the arc
+  if (addButtonPos && collapseTime === null) {
+    const addIdx = arcPositions.length; // stagger index
+    const expandElapsed = now - showTime - addIdx * STAGGER;
+    if (expandElapsed > 0) {
+      const addT = Math.min(1, expandElapsed / ANIM_DURATION);
+      const addEased = addT < 0.5 ? 4 * addT * addT * addT : 1 - Math.pow(-2 * addT + 2, 3) / 2;
+      const addX = addButtonPos.centerScreenX + (addButtonPos.screenX - addButtonPos.centerScreenX) * addEased;
+      const addY = addButtonPos.centerScreenY + (addButtonPos.screenY - addButtonPos.centerScreenY) * addEased;
+      const addR = CIRCLE_RADIUS * (0.4 + 0.6 * addEased);
+
+      ctx.globalAlpha = addEased * 0.7;
+      ctx.beginPath();
+      ctx.arc(addX, addY, addR, 0, Math.PI * 2);
+      ctx.fillStyle = '#555';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Plus icon
+      ctx.strokeStyle = '#ccc';
+      ctx.lineWidth = 1.5;
+      const ps = addR * 0.45;
+      ctx.beginPath();
+      ctx.moveTo(addX - ps, addY);
+      ctx.lineTo(addX + ps, addY);
+      ctx.moveTo(addX, addY - ps);
+      ctx.lineTo(addX, addY + ps);
+      ctx.stroke();
+
+      // "Add Body" label
+      if (addEased > 0.5) {
+        const rdx = addButtonPos.screenX - addButtonPos.centerScreenX;
+        const rdy = addButtonPos.screenY - addButtonPos.centerScreenY;
+        const rLen = Math.sqrt(rdx * rdx + rdy * rdy);
+        if (rLen > 1) {
+          const nrx = rdx / rLen, nry = rdy / rLen;
+          const lblX = addButtonPos.screenX + nrx * 22;
+          const lblY = addButtonPos.screenY + nry * 22;
+          const radAngle = Math.atan2(nry, nrx);
+          const txtAngle = radAngle - Math.PI;
+          ctx.save();
+          ctx.globalAlpha = addEased * 0.6;
+          ctx.translate(lblX, lblY);
+          ctx.rotate(txtAngle);
+          ctx.font = '10px -apple-system, BlinkMacSystemFont, sans-serif';
+          ctx.fillStyle = '#888';
+          ctx.textAlign = 'right';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('Add Body', 0, 0);
+          ctx.restore();
+        }
+      }
     }
   }
 
