@@ -292,6 +292,7 @@ let imageStartScale = 1;
 
 // Tracer drag state
 let tracerDragId: string | null = null;
+let longPressPendingTracerId: string | null = null;
 
 // Long-press arc selector state
 let longPressTimer: ReturnType<typeof setTimeout> | null = null;
@@ -616,7 +617,9 @@ export function handleMouseDown(e: PointerEvent, canvas: HTMLCanvasElement) {
       const worldPt = localToWorld(tracer.localPosition, transform);
       if (distance(worldPos, worldPt) < HIT_RADIUS / editor.camera.zoom) {
         editor.select(tracer.id);
-        tracerDragId = tracer.id;
+        // Don't start drag immediately — let long-press timer determine intent
+        // Drag will start if user moves beyond threshold (cancelling the arc timer)
+        longPressPendingTracerId = tracer.id;
         mechanism.pushHistory();
         startTracerArcTimer(tracer.id, e.clientX, e.clientY);
         return;
@@ -745,41 +748,6 @@ export function handleMouseDown(e: PointerEvent, canvas: HTMLCanvasElement) {
   }
 
   // --- JOINTS TOOL ---
-  if (editor.jointMode === 'autochain') {
-    const joint = hitTestJoint(worldPos, mechanism.joints, editor.camera.zoom);
-    if (joint) {
-      // Clicking existing joint: attach last chain body to it and end chain
-      const lastBodyId = editor.autoChainLastBodyId;
-      if (lastBodyId) {
-        mechanism.addJointToBody(joint.id, lastBodyId);
-      }
-      editor.setJointMode('manual');
-      editor.select(joint.id);
-    } else {
-      // Place a new chain joint in free space
-      const pos = editor.gridEnabled ? snapToGrid(worldPos, editor.gridSize) : worldPos;
-      const lastBodyId = editor.autoChainLastBodyId;
-
-      // Create a new body for the forward connection
-      const newBodyId = mechanism.addBody('Body');
-
-      // Determine which bodies this joint belongs to
-      let bodyIds: string[];
-      if (lastBodyId === null) {
-        // First joint in chain: Base + new body
-        bodyIds = [mechanism.baseBodyId, newBodyId];
-      } else {
-        // Subsequent joints: previous body + new body
-        bodyIds = [lastBodyId, newBodyId];
-      }
-
-      mechanism.addJoint('revolute', pos, bodyIds);
-      editor.setAutoChainLastBodyId(newBodyId);
-    }
-    return;
-  }
-
-  // --- MANUAL JOINTS ---
   // Check slider rail line hit first (before joint hit, so joints take priority via the joint check below)
   const joint = hitTestJoint(worldPos, mechanism.joints, editor.camera.zoom);
   if (!joint) {
@@ -896,6 +864,11 @@ export function handleMouseMove(e: PointerEvent, canvas: HTMLCanvasElement) {
       clearTimeout(longPressTimer);
       longPressTimer = null;
       longPressJointId = null;
+      // If a tracer was pending, start dragging it now
+      if (longPressPendingTracerId) {
+        tracerDragId = longPressPendingTracerId;
+        longPressPendingTracerId = null;
+      }
     }
   }
 
@@ -1114,6 +1087,7 @@ export function handleMouseUp(_e: PointerEvent | MouseEvent, canvas?: HTMLCanvas
   imageDragType = null;
   sliderLineDragId = null;
   tracerDragId = null;
+  longPressPendingTracerId = null;
   sliderLineDragStartPositions = null;
   outlineVertexDragIndex = null;
   outlineVertexDragOutlineId = null;
@@ -1165,8 +1139,6 @@ export function handleKeyDown(e: KeyboardEvent) {
           // Cancel collider placement — remove the already-placed A joint
           mechanism.undo();
           editor.setColliderPointA(null);
-        } else if (editor.jointMode === 'autochain') {
-          editor.setJointMode('manual');
         } else if (editor.outlinePoints.length > 0) {
           editor.clearOutlinePoints();
         } else {

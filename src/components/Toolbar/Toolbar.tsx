@@ -14,16 +14,6 @@ const IconPivot = () => (
   </svg>
 );
 
-const IconAutoChain = () => (
-  <svg className="tool-icon-svg" viewBox="0 0 16 16" width="16" height="16">
-    <circle cx="3" cy="8" r="2" fill="currentColor" />
-    <circle cx="13" cy="4" r="2" fill="currentColor" />
-    <circle cx="13" cy="12" r="2" fill="currentColor" />
-    <line x1="3" y1="8" x2="13" y2="4" stroke="currentColor" strokeWidth="1.2" />
-    <line x1="3" y1="8" x2="13" y2="12" stroke="currentColor" strokeWidth="1.2" />
-  </svg>
-);
-
 const IconSlider = () => (
   <svg className="tool-icon-svg" viewBox="0 0 16 16" width="16" height="16">
     <line x1="2" y1="8" x2="14" y2="8" stroke="currentColor" strokeWidth="1.5" />
@@ -69,9 +59,7 @@ const IconImage = () => (
 export function Toolbar() {
   const mode = useEditorStore((s) => s.mode);
   const createTool = useEditorStore((s) => s.createTool);
-  const jointMode = useEditorStore((s) => s.jointMode);
   const setCreateTool = useEditorStore((s) => s.setCreateTool);
-  const setJointMode = useEditorStore((s) => s.setJointMode);
   const setMode = useEditorStore((s) => s.setMode);
   const removeJoint = useMechanismStore((s) => s.removeJoint);
   const removeOutline = useMechanismStore((s) => s.removeOutline);
@@ -149,21 +137,12 @@ export function Toolbar() {
   const isJointsTool = isPivotTool || isSliderTool || isColliderTool;
 
   const renderHints = () => {
-    if (isPivotTool && jointMode === 'manual') {
+    if (isPivotTool) {
       return (
         <>
           <div className="sim-hint">Click to add pivot joint</div>
-          <div className="sim-hint">Click joint to select</div>
+          <div className="sim-hint">Hold to assign bodies</div>
           <div className="sim-hint">Double-click to toggle fixed</div>
-        </>
-      );
-    }
-    if (isPivotTool && jointMode === 'autochain') {
-      return (
-        <>
-          <div className="sim-hint">Click to place chain joints</div>
-          <div className="sim-hint">Click existing joint to end chain</div>
-          <div className="sim-hint">Escape to stop</div>
         </>
       );
     }
@@ -243,22 +222,11 @@ export function Toolbar() {
 
             <button
               className={`tool-btn ${isPivotTool ? 'active' : ''}`}
-              onClick={() => { setCreateTool('joints'); if (jointMode === 'autochain') setJointMode('manual'); }}
+              onClick={() => setCreateTool('joints')}
             >
               <IconPivot />
               <span className="tool-name">Pivot</span>
             </button>
-            {isPivotTool && (
-              <div className="sub-tools">
-                <button
-                  className={`tool-btn sub ${jointMode === 'autochain' ? 'active' : ''}`}
-                  onClick={() => setJointMode(jointMode === 'autochain' ? 'manual' : 'autochain')}
-                >
-                  <IconAutoChain />
-                  <span className="tool-name">Auto Chain</span>
-                </button>
-              </div>
-            )}
 
             <button
               className={`tool-btn ${isSliderTool ? 'active' : ''}`}

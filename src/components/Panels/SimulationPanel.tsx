@@ -195,7 +195,6 @@ export function SimulationPanel() {
         <div className="panel-info">Time: {time.toFixed(2)}s</div>
 
         <div className="sim-controls">
-          <button className="tool-btn" onClick={reset}>Reset</button>
           <button className="tool-btn" onClick={clearTraces}>Clear Traces</button>
         </div>
 
@@ -226,10 +225,6 @@ export function SimulationPanel() {
       <div className="panel-info">DOF: {dof}</div>
 
       {physicsSection}
-
-      <div className="sim-controls" style={{ marginTop: 4 }}>
-        <button className="tool-btn" onClick={clearTraces}>Clear Traces</button>
-      </div>
 
       {viewSection}
     </div>

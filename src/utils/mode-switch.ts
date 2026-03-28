@@ -1,6 +1,7 @@
 import type { AppMode, Vec2 } from '../types';
 import { useEditorStore } from '../store/editor-store';
 import { useMechanismStore } from '../store/mechanism-store';
+import { useSimulationStore } from '../store/simulation-store';
 import { computeBodyTransform, localToWorld } from '../core/body-transform';
 
 /**
@@ -35,6 +36,9 @@ export function switchMode(newMode: AppMode): void {
     editor.setSavedPositions(positions);
     mech.regenerateLinks();
   } else {
+    // Clear all traces when leaving simulate mode
+    useSimulationStore.getState().clearTraces();
+
     // Restore saved positions
     if (editor.savedPositions) {
       const currentJoints = useMechanismStore.getState().joints;
