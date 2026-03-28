@@ -409,8 +409,8 @@ export function handleMouseDown(e: PointerEvent, canvas: HTMLCanvasElement) {
       const jointIdB = mechanism.addJoint('revolute', midPos);
       mechanism.addSlider(editor.sliderPointA.jointId, jointIdC, jointIdB);
       editor.setSliderPointA(null);
-      // Revert to pivot tool after completing slider
       editor.setCreateTool('joints');
+      startArcTimer(jointIdC, e.clientX, e.clientY);
     }
     return;
   }
@@ -470,8 +470,8 @@ export function handleMouseDown(e: PointerEvent, canvas: HTMLCanvasElement) {
       // Add a rigid link between A and C
       mechanism.addLink(editor.colliderPointA.jointId, jointIdC);
       editor.setColliderPointA(null);
-      // Auto-select the barrier line so user can immediately assign bodies
       editor.select(colliderId);
+      startArcTimer(jointIdC, e.clientX, e.clientY);
     }
     return;
   }
