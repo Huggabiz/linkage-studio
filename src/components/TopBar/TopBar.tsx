@@ -150,6 +150,10 @@ export function TopBar() {
 
   return (
     <div className="top-bar">
+      <ProjectNameInput />
+
+      <div className="top-bar-separator" />
+
       <div className="top-bar-group">
         <button className="top-bar-btn" onClick={handleSave} title="Save file" disabled={!isCreate}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -197,10 +201,6 @@ export function TopBar() {
           Clear All
         </button>
       </div>
-
-      <div className="top-bar-separator" />
-
-      <ProjectNameInput />
 
       <div className="top-bar-spacer" />
 
