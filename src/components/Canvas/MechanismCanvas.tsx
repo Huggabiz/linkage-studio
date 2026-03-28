@@ -89,7 +89,7 @@ export function MechanismCanvas() {
         colliderPointA: editor.colliderPointA?.position ?? null,
         editingOutlineId: editor.editingOutlineId,
         editingVertexIndex: editor.editingVertexIndex,
-        arcSelector: editor.arcSelector ? { jointId: editor.arcSelector.jointId, position: editor.arcSelector.position, showTime: editor.arcSelector.showTime } : null,
+        arcSelector: editor.arcSelector ? { jointId: editor.arcSelector.jointId, position: editor.arcSelector.position, showTime: editor.arcSelector.showTime, collapseTime: editor.arcSelector.collapseTime } : null,
       });
     } catch (e) {
       console.error('Render error:', e);
