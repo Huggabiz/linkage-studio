@@ -258,9 +258,14 @@ export function Layout() {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/jpeg,image/png,image/bmp,image/webp';
+    input.style.position = 'fixed';
+    input.style.top = '-9999px';
+    input.style.left = '-9999px';
+    document.body.appendChild(input);
+    const cleanup = () => { if (input.parentNode) input.parentNode.removeChild(input); };
     input.onchange = () => {
       const file = input.files?.[0];
-      if (!file) return;
+      if (!file) { cleanup(); return; }
       const reader = new FileReader();
       reader.onload = () => {
         const dataUrl = reader.result as string;
@@ -276,9 +281,12 @@ export function Layout() {
           const id = addImage(baseBodyId, dataUrl, img.naturalWidth, img.naturalHeight, center);
           useEditorStore.getState().select(id);
           setCreateTool('image');
+          cleanup();
         };
+        img.onerror = cleanup;
         img.src = dataUrl;
       };
+      reader.onerror = cleanup;
       reader.readAsDataURL(file);
     };
     input.click();
