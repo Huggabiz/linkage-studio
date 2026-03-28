@@ -67,7 +67,7 @@ function App() {
             }
             const com = totalArea > 1e-10 ? { x: comX / totalArea, y: comY / totalArea } : polygonCentroid(bodyOutlines[0].points.map((p) => localToWorld(p, transform)));
             const area = totalArea;
-            const massMult = Math.max(0.1, area / 1000);
+            const massMult = Math.max(0.1, area / 5000);
 
             // Find free joints in this body
             const freeIds = body.jointIds.filter((jid) => !fixedJointIds.has(jid) && mech.joints[jid]);
@@ -94,6 +94,15 @@ function App() {
               const perJoint = (freeIds.length > 0) ? (massMult * freeIds.length) / freeIds.length : massMult;
               for (const jid of freeIds) jointGravityWeights.set(jid, perJoint);
             }
+          }
+        }
+
+        // Build set of joint IDs in CoM-enabled bodies (to suppress per-link gravity vectors)
+        let comJointIds: Set<string> | undefined;
+        if (bodiesWithCOM.length > 0) {
+          comJointIds = new Set<string>();
+          for (const body of bodiesWithCOM) {
+            for (const jid of body.jointIds) comJointIds.add(jid);
           }
         }
 
@@ -148,6 +157,7 @@ function App() {
           mech.colliders,
           colliderSidesRef.current ?? undefined,
           mech.bodies,
+          comJointIds,
         );
 
         sim.setSolverResult(result);
