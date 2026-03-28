@@ -112,7 +112,7 @@ export const useEditorStore = create<EditorStore>((set) => ({
   linkStartJointId: null,
   simDrag: null,
   savedPositions: null,
-  activeBodyIds: new Set(['base', 'body1']),
+  activeBodyIds: new Set<string>(),
   showLinks: true,
   showVectors: true,
   showRulers: true,
