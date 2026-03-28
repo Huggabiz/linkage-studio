@@ -81,13 +81,24 @@ export function drawJoint(
     ctx.fillStyle = '#ffffff';
     ctx.fill();
   } else if (joint.type === 'fixed') {
+    // Ground symbol: horizontal line + hatching below
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 1.5 / zoom;
-    const s = r * 0.5;
-    for (let i = -1; i <= 1; i++) {
+    const s = r * 0.55;
+    // Horizontal ground line
+    ctx.beginPath();
+    ctx.moveTo(x - s, y);
+    ctx.lineTo(x + s, y);
+    ctx.stroke();
+    // Hatch lines below
+    ctx.lineWidth = 1 / zoom;
+    const hatchCount = 3;
+    const hatchSpacing = (s * 2) / (hatchCount + 1);
+    for (let i = 1; i <= hatchCount; i++) {
+      const hx = x - s + i * hatchSpacing;
       ctx.beginPath();
-      ctx.moveTo(x + i * s, y - s);
-      ctx.lineTo(x + i * s - s * 0.4, y + s);
+      ctx.moveTo(hx, y);
+      ctx.lineTo(hx - s * 0.35, y + s * 0.6);
       ctx.stroke();
     }
   }
@@ -296,7 +307,7 @@ export function drawMechanism(
           break;
         }
       }
-      // Skip links where both endpoints are only in the base body
+      // Skip links where both endpoints are in the base body
       if (!owningBody && baseJointIds.has(idA) && baseJointIds.has(idB)) continue;
       // Skip if the owning body has links hidden
       if (owningBody && !owningBody.showLinks) continue;
