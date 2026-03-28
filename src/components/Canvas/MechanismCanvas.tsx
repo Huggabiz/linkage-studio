@@ -86,7 +86,7 @@ export function MechanismCanvas() {
         gravityEnabled: sim.gravityEnabled,
         gravityStrength: sim.gravityStrength,
         baseBodyId: mechanism.baseBodyId,
-        frozenOutlinePoints: editor.lockOutlines ? (() => {
+        frozenOutlinePoints: (editor.lockOutlines && editor.mode === 'create') ? (() => {
           // Ensure all outlines are in the frozen map — fill missing ones
           const frozen = editor.frozenOutlineWorldPoints;
           let needsUpdate = false;
