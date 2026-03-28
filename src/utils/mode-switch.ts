@@ -21,6 +21,21 @@ export function switchMode(newMode: AppMode): void {
   }
 
   if (newMode === 'simulate') {
+    // If lockOutlines is on but frozen points are empty, populate them now
+    if (editor.lockOutlines && editor.frozenOutlineWorldPoints.size === 0) {
+      const mechNow = useMechanismStore.getState();
+      const frozen = new Map<string, Vec2[]>();
+      for (const outline of Object.values(mechNow.outlines)) {
+        const body = mechNow.bodies[outline.bodyId];
+        if (!body || outline.points.length < 2) continue;
+        const transform = computeBodyTransform(body, mechNow.joints);
+        frozen.set(outline.id, outline.points.map((p) => localToWorld(p, transform)));
+      }
+      if (frozen.size > 0) {
+        editor.setLockOutlines(true, frozen);
+      }
+    }
+
     // Reproject outlines if locked
     if (editor.lockOutlines && editor.frozenOutlineWorldPoints.size > 0) {
       mech.reprojectOutlinesFromWorld(editor.frozenOutlineWorldPoints);
