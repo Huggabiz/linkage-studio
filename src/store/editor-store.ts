@@ -92,8 +92,11 @@ interface EditorStore {
     showTime: number;
     collapseTime: number | null;
     readyToToggle: Set<string>;
-    /** Body ID created via the Add Body button (for toggle-back removal) */
     createdBodyId: string | null;
+    /** Timestamp of the last toggle (for grace period revert on release) */
+    lastToggleTime: number;
+    /** Info to revert the last toggle if within grace period */
+    lastToggle: { bodyId: string; wasAdded: boolean } | null;
   } | null;
   setEditingOutline(outlineId: string | null): void;
   setEditingVertexIndex(index: number | null): void;
