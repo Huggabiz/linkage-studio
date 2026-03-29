@@ -21,6 +21,12 @@ export function switchMode(newMode: AppMode): void {
     editor.setSimDrag(null);
   }
 
+  // Exit outline edit mode gracefully FIRST (saves vertex changes to frozen points)
+  if (editor.editingOutlineId) {
+    exitOutlineEditMode();
+    // Re-read editor state since exitOutlineEditMode modified it
+  }
+
   if (newMode === 'simulate') {
     // If lockOutlines is on but frozen points are empty, populate them now
     if (editor.lockOutlines && editor.frozenOutlineWorldPoints.size === 0) {
@@ -66,11 +72,6 @@ export function switchMode(newMode: AppMode): void {
       editor.setSavedPositions(null);
       mech.regenerateLinks();
     }
-  }
-
-  // Exit outline edit mode gracefully (saves vertex changes to frozen points)
-  if (editor.editingOutlineId) {
-    exitOutlineEditMode();
   }
 
   editor.setMode(newMode);
