@@ -3,6 +3,7 @@ import { useEditorStore } from '../store/editor-store';
 import { useMechanismStore } from '../store/mechanism-store';
 import { useSimulationStore } from '../store/simulation-store';
 import { computeBodyTransform, localToWorld } from '../core/body-transform';
+import { exitOutlineEditMode } from '../interaction/tool-manager';
 
 /**
  * Shared mode switch logic used by both the expanded Toolbar and the
@@ -65,6 +66,11 @@ export function switchMode(newMode: AppMode): void {
       editor.setSavedPositions(null);
       mech.regenerateLinks();
     }
+  }
+
+  // Exit outline edit mode gracefully (saves vertex changes to frozen points)
+  if (editor.editingOutlineId) {
+    exitOutlineEditMode();
   }
 
   editor.setMode(newMode);

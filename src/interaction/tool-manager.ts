@@ -246,7 +246,7 @@ function handleArcHover(worldPos: Vec2, editor: ReturnType<typeof useEditorStore
 }
 
 /** Exit outline editing mode and update frozen world points. */
-function exitOutlineEditMode() {
+export function exitOutlineEditMode() {
   const editor = useEditorStore.getState();
   const mechanism = useMechanismStore.getState();
   const outlineId = editor.editingOutlineId;
