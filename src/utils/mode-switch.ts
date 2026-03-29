@@ -24,12 +24,13 @@ export function switchMode(newMode: AppMode): void {
   // Exit outline edit mode gracefully FIRST (saves vertex changes to frozen points)
   if (editor.editingOutlineId) {
     exitOutlineEditMode();
-    // Re-read editor state since exitOutlineEditMode modified it
   }
+  // Re-read editor state since exitOutlineEditMode may have modified frozen points
+  const editorFresh = useEditorStore.getState();
 
   if (newMode === 'simulate') {
     // If lockOutlines is on but frozen points are empty, populate them now
-    if (editor.lockOutlines && editor.frozenOutlineWorldPoints.size === 0) {
+    if (editorFresh.lockOutlines && editorFresh.frozenOutlineWorldPoints.size === 0) {
       const mechNow = useMechanismStore.getState();
       const frozen = new Map<string, Vec2[]>();
       for (const outline of Object.values(mechNow.outlines)) {
@@ -39,14 +40,15 @@ export function switchMode(newMode: AppMode): void {
         frozen.set(outline.id, outline.points.map((p) => localToWorld(p, transform)));
       }
       if (frozen.size > 0) {
-        editor.setLockOutlines(true, frozen);
+        editorFresh.setLockOutlines(true, frozen);
       }
     }
 
-    // Reproject outlines if locked
-    if (editor.lockOutlines && editor.frozenOutlineWorldPoints.size > 0) {
-      mech.reprojectOutlinesFromWorld(editor.frozenOutlineWorldPoints);
-      editor.setLockOutlines(false);
+    // Reproject outlines if locked — re-read state since setLockOutlines may have updated it
+    const editorForReproject = useEditorStore.getState();
+    if (editorForReproject.lockOutlines && editorForReproject.frozenOutlineWorldPoints.size > 0) {
+      mech.reprojectOutlinesFromWorld(editorForReproject.frozenOutlineWorldPoints);
+      editorForReproject.setLockOutlines(false);
     }
 
     // Save current positions for restore on mode switch back
@@ -55,26 +57,26 @@ export function switchMode(newMode: AppMode): void {
       if (id.startsWith('__temp_')) continue;
       positions[id] = { ...joint.position };
     }
-    editor.setSavedPositions(positions);
+    editorFresh.setSavedPositions(positions);
     mech.regenerateLinks();
   } else {
     // Clear all traces when leaving simulate mode
     useSimulationStore.getState().clearTraces();
 
     // Restore saved positions
-    if (editor.savedPositions) {
+    if (editorFresh.savedPositions) {
       const currentJoints = useMechanismStore.getState().joints;
       for (const [id, pos] of Object.entries(editor.savedPositions)) {
         if (currentJoints[id]) {
           mech.moveJoint(id, pos);
         }
       }
-      editor.setSavedPositions(null);
+      editorFresh.setSavedPositions(null);
       mech.regenerateLinks();
     }
   }
 
-  editor.setMode(newMode);
+  editorFresh.setMode(newMode);
 
   // After switching back to create mode, capture fresh frozen outline points
   if (newMode === 'create') {
