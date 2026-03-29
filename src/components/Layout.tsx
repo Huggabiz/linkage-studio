@@ -263,7 +263,7 @@ export function Layout() {
     input.style.left = '-9999px';
     document.body.appendChild(input);
     const cleanup = () => { if (input.parentNode) input.parentNode.removeChild(input); };
-    input.onchange = () => {
+    input.addEventListener('change', () => {
       const file = input.files?.[0];
       if (!file) { cleanup(); return; }
       const reader = new FileReader();
@@ -288,7 +288,7 @@ export function Layout() {
       };
       reader.onerror = cleanup;
       reader.readAsDataURL(file);
-    };
+    });
     input.click();
   };
 

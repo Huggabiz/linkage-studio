@@ -275,29 +275,29 @@ export function openFilePicker(): Promise<string | null> {
     input.style.left = '-9999px';
     document.body.appendChild(input);
 
+    let resolved = false;
     const cleanup = () => {
       if (input.parentNode) input.parentNode.removeChild(input);
     };
-
-    input.onchange = () => {
-      const file = input.files?.[0];
-      if (!file) { cleanup(); resolve(null); return; }
-      const reader = new FileReader();
-      reader.onload = () => { cleanup(); resolve(reader.result as string); };
-      reader.onerror = () => { cleanup(); resolve(null); };
-      reader.readAsText(file);
+    const done = (result: string | null) => {
+      if (resolved) return;
+      resolved = true;
+      cleanup();
+      resolve(result);
     };
 
-    // Handle cancel (iOS doesn't always fire onchange on cancel)
-    window.addEventListener('focus', function onFocus() {
-      window.removeEventListener('focus', onFocus);
-      setTimeout(() => {
-        if (!input.files || input.files.length === 0) {
-          cleanup();
-          resolve(null);
-        }
-      }, 500);
-    }, { once: true });
+    input.addEventListener('change', () => {
+      const file = input.files?.[0];
+      if (!file) { done(null); return; }
+      const reader = new FileReader();
+      reader.onload = () => done(reader.result as string);
+      reader.onerror = () => done(null);
+      reader.readAsText(file);
+    });
+
+    // Use a long timeout as a safety net for cancel detection
+    // (iOS doesn't always fire change on cancel)
+    input.addEventListener('cancel', () => done(null));
 
     input.click();
   });

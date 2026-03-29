@@ -104,7 +104,6 @@ export function Toolbar() {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/jpeg,image/png,image/bmp,image/webp';
-    // Append to DOM for iOS Safari reliability
     input.style.position = 'fixed';
     input.style.top = '-9999px';
     input.style.left = '-9999px';
@@ -112,7 +111,7 @@ export function Toolbar() {
 
     const cleanup = () => { if (input.parentNode) input.parentNode.removeChild(input); };
 
-    input.onchange = () => {
+    input.addEventListener('change', () => {
       const file = input.files?.[0];
       if (!file) { cleanup(); return; }
       const reader = new FileReader();
@@ -137,7 +136,7 @@ export function Toolbar() {
       };
       reader.onerror = cleanup;
       reader.readAsDataURL(file);
-    };
+    });
 
     input.click();
   };
