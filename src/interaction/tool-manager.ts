@@ -8,8 +8,9 @@ import { snapToGrid, distance, sub, dot, lengthSq } from '../core/math/vec2';
 import { computeBodyTransform, worldToLocal, localToWorld } from '../core/body-transform';
 import { HIT_RADIUS } from '../utils/constants';
 
-/** Start the long-press arc selector timer for a given joint. */
+/** Start the long-press arc selector timer for a given joint. No-op for touch input. */
 function startArcTimer(jointId: string, screenX: number, screenY: number) {
+  if (lastPointerType === 'touch') return; // Touch uses tap-on-release, not hold
   longPressStartScreen = { x: screenX, y: screenY };
   longPressJointId = jointId;
   if (longPressTimer) clearTimeout(longPressTimer);
@@ -33,8 +34,9 @@ function startArcTimer(jointId: string, screenX: number, screenY: number) {
   }, LONG_PRESS_MS);
 }
 
-/** Start the long-press arc selector timer for a collider barrier line. */
+/** Start the long-press arc selector timer for a collider barrier line. No-op for touch. */
 function startColliderArcTimer(colliderId: string, worldPos: Vec2, screenX: number, screenY: number) {
+  if (lastPointerType === 'touch') return;
   longPressStartScreen = { x: screenX, y: screenY };
   longPressJointId = colliderId; // reuse for cancel tracking
   if (longPressTimer) clearTimeout(longPressTimer);
@@ -55,8 +57,9 @@ function startColliderArcTimer(colliderId: string, worldPos: Vec2, screenX: numb
   }, LONG_PRESS_MS);
 }
 
-/** Start the long-press arc selector timer for a tracer (single-select body mode). */
+/** Start the long-press arc selector timer for a tracer (single-select body mode). No-op for touch. */
 function startTracerArcTimer(tracerId: string, screenX: number, screenY: number) {
+  if (lastPointerType === 'touch') return;
   longPressStartScreen = { x: screenX, y: screenY };
   longPressJointId = tracerId;
   if (longPressTimer) clearTimeout(longPressTimer);
@@ -294,6 +297,9 @@ let imageStartScale = 1;
 let tracerDragId: string | null = null;
 let longPressPendingTracerId: string | null = null;
 
+// Track pointer type to disable arc timer for touch
+let lastPointerType: string = 'mouse';
+
 // Long-press arc selector state
 let longPressTimer: ReturnType<typeof setTimeout> | null = null;
 let longPressJointId: string | null = null;
@@ -302,7 +308,8 @@ const LONG_PRESS_MS = 300;
 const LONG_PRESS_MOVE_THRESHOLD_BASE = 8; // px screen movement to cancel (minimum)
 let imageStartPos: Vec2 = { x: 0, y: 0 };
 
-export function handleMouseDown(e: PointerEvent, canvas: HTMLCanvasElement) {
+export function handleMouseDown(e: PointerEvent | MouseEvent, canvas: HTMLCanvasElement) {
+  lastPointerType = 'pointerType' in e ? e.pointerType : 'mouse';
   const editor = useEditorStore.getState();
   const mechanism = useMechanismStore.getState();
   const rect = canvas.getBoundingClientRect();
@@ -627,8 +634,9 @@ export function handleMouseDown(e: PointerEvent, canvas: HTMLCanvasElement) {
     }
 
     if (editor.selectedIds.size > 0) {
-      // Deselect, but start a timer — if held, place a new tracer + arc selector
       editor.clearSelection();
+      if (lastPointerType === 'touch') return; // Touch: just deselect, no deferred place
+      // Deselect + start timer — if held, place a new tracer + arc selector
       const pos2 = editor.gridEnabled ? snapToGrid(worldPos, editor.gridSize) : worldPos;
       longPressStartScreen = { x: e.clientX, y: e.clientY };
       longPressJointId = '__deferred_tracer__';
@@ -832,8 +840,9 @@ export function handleMouseDown(e: PointerEvent, canvas: HTMLCanvasElement) {
     mechanism.pushHistory();
     startArcTimer(joint.id, e.clientX, e.clientY);
   } else if (editor.selectedIds.size > 0) {
-    // Deselect, but start a timer — if held, place a new joint + arc selector
     editor.clearSelection();
+    if (lastPointerType === 'touch') return; // Touch: just deselect, no deferred place
+    // Deselect + start timer — if held, place a new joint + arc selector
     const pos2 = editor.gridEnabled ? snapToGrid(worldPos, editor.gridSize) : worldPos;
     longPressStartScreen = { x: e.clientX, y: e.clientY };
     longPressJointId = '__deferred_place__';
