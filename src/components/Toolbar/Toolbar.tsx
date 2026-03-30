@@ -64,8 +64,10 @@ export function Toolbar() {
   const removeJoint = useMechanismStore((s) => s.removeJoint);
   const removeOutline = useMechanismStore((s) => s.removeOutline);
   const removeImage = useMechanismStore((s) => s.removeImage);
+  const removeTracer = useMechanismStore((s) => s.removeTracer);
   const joints = useMechanismStore((s) => s.joints);
   const outlines = useMechanismStore((s) => s.outlines);
+  const tracers = useMechanismStore((s) => s.tracers);
   const images = useMechanismStore((s) => s.images);
   const selectedIds = useEditorStore((s) => s.selectedIds);
   const clearSelection = useEditorStore((s) => s.clearSelection);
@@ -94,6 +96,7 @@ export function Toolbar() {
       if (joints[id]) removeJoint(id);
       else if (outlines[id]) removeOutline(id);
       else if (images[id]) removeImage(id);
+      else if (tracers[id]) removeTracer(id);
     }
     clearSelection();
   };

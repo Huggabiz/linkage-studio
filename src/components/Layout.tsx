@@ -102,7 +102,9 @@ function CollapsedDeleteButton() {
   const removeJoint = useMechanismStore((s) => s.removeJoint);
   const removeOutline = useMechanismStore((s) => s.removeOutline);
   const removeImage = useMechanismStore((s) => s.removeImage);
+  const removeTracer = useMechanismStore((s) => s.removeTracer);
   const removeOutlineVertex = useMechanismStore((s) => s.removeOutlineVertex);
+  const tracers = useMechanismStore((s) => s.tracers);
   const selectedIds = useEditorStore((s) => s.selectedIds);
   const clearSelection = useEditorStore((s) => s.clearSelection);
   const editingOutlineId = useEditorStore((s) => s.editingOutlineId);
@@ -125,6 +127,7 @@ function CollapsedDeleteButton() {
       if (joints[id]) removeJoint(id);
       else if (outlines[id]) removeOutline(id);
       else if (images[id]) removeImage(id);
+      else if (tracers[id]) removeTracer(id);
     }
     clearSelection();
   };
