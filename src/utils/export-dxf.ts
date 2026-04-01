@@ -49,7 +49,7 @@ export function exportDXF(
   showLinksGlobal: boolean = true,
 ): string {
   const out: string[] = [];
-  const p = (code: number, val: string | number) => { out.push(`  ${code}\n${val}`); };
+  const p = (code: number, val: string | number) => { out.push(String(code)); out.push(String(val)); };
 
   const bodyList = Object.values(bodies);
 
