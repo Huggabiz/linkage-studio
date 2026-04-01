@@ -2,7 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import { useEditorStore } from '../../store/editor-store';
 import { useMechanismStore } from '../../store/mechanism-store';
 import { useSimulationStore } from '../../store/simulation-store';
-import { serializeMechanism, deserializeMechanism, saveFileAs, openFilePicker } from '../../utils/file-io';
+import { serializeMechanism, deserializeMechanism, saveFileAs, openFilePicker, downloadFile } from '../../utils/file-io';
+import { exportDXF } from '../../utils/export-dxf';
 import type { GridLevel } from '../../types';
 import './TopBar.css';
 
@@ -204,6 +205,31 @@ export function TopBar() {
       </div>
 
       <div className="top-bar-spacer" />
+
+      <div className="top-bar-group">
+        <button
+          className="top-bar-btn"
+          onClick={() => {
+            const mech = useMechanismStore.getState();
+            const editor = useEditorStore.getState();
+            const dxf = exportDXF(
+              mech.joints, mech.links, mech.bodies, mech.baseBodyId,
+              mech.outlines, mech.sliders, mech.colliders,
+            );
+            const name = editor.projectName || 'Untitled';
+            downloadFile(dxf, `${name}.dxf`);
+          }}
+          title="Export as DXF"
+          disabled={!isCreate}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          Export DXF
+        </button>
+      </div>
 
       <div className="top-bar-brand">
         <span>Slinker v{__APP_VERSION__}</span>
