@@ -214,7 +214,7 @@ export function TopBar() {
             const editor = useEditorStore.getState();
             const dxf = exportDXF(
               mech.joints, mech.links, mech.bodies, mech.baseBodyId,
-              mech.outlines, mech.sliders, mech.colliders,
+              mech.outlines, mech.sliders, mech.colliders, editor.showLinks,
             );
             const name = editor.projectName || 'Untitled';
             downloadFile(dxf, `${name}.dxf`);
